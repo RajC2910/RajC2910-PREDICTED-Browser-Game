@@ -1,44 +1,45 @@
-# [Project name]
+# PREDICTED
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+PREDICTED is a dependency-free browser game about outsmarting an imperfect model that learns from the player's choices.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/predicted-game run dev` — run the game preview
+- `PORT=26062 BASE_PATH=/ pnpm --filter @workspace/predicted-game run build` — build the static game bundle
 - `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- No backend, database, secrets, or API keys are required for the game.
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- pnpm workspace, Node.js 24, Vite
+- Frontend: vanilla HTML, CSS, and JavaScript
+- Build: Vite static bundle
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/predicted-game/index.html` — static entrypoint and metadata
+- `artifacts/predicted-game/src/main.js` — game state, prediction model, scoring, persistence, and rendering
+- `artifacts/predicted-game/src/index.css` — responsive visual system and motion
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The player model is local and intentionally imperfect: frequency, recency, transition weights, and a small error rate create room to bluff.
+- Reward placement is randomized every turn so the highest-value lane does not become a fixed optimal choice.
+- The run profile is stored in `localStorage`; no server state is needed for the first-session retention concept.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- A 60-second run presents three rewarded choices and exposes the model's current predicted move.
+- Players can use mouse/touch or A/S/D keyboard controls, earn high-confidence bluff bonuses, and review an end-of-run archetype and challenge.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Keep the prototype focused on the prediction/bluff loop; do not add accounts, multiplayer, progression systems, ads, or external AI services.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- The artifact Vite config requires `PORT` and `BASE_PATH` for manual CLI builds; the managed preview workflow supplies them automatically.
+- The source entrypoints use relative paths so the unbuilt static files can be hosted from a GitHub Pages repository path.
 
 ## Pointers
 

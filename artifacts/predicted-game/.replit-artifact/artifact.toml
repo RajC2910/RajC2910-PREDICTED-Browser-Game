@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "PREDICTED"
+description = "A minimalist psychological strategy game where a lightweight adaptive model predicts the player's next move and the player learns to manipulate it."
+version = "1.0.0"
+id = "artifacts/predicted-game"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26062
+
+[services.development]
+run = "pnpm --filter @workspace/predicted-game run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/predicted-game", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/predicted-game/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26062"
+BASE_PATH = "/"

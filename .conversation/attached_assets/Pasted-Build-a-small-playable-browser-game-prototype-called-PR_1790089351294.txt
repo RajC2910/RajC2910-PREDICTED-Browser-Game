@@ -1,0 +1,278 @@
+Build a small, playable browser game prototype called PREDICTED.
+
+IMPORTANT:
+This is a game-design prototype for a professional game-design hiring test. The goal is to test the core gameplay loop, not to create a large or visually elaborate game.
+
+TECHNICAL CONSTRAINTS:
+
+* Use only HTML, CSS, and vanilla JavaScript.
+* Do NOT use React.
+* Do NOT use a backend.
+* Do NOT use a database.
+* Do NOT require an API key.
+* Do NOT call any external AI API.
+* Do NOT require npm, a build process, or a development server for the final game.
+* The final game must work as a static website.
+* Everything necessary to play must be contained in the project.
+* Keep the project simple enough that it can later be uploaded directly to a GitHub repository and hosted using GitHub Pages.
+* You may use an external CDN only if absolutely necessary, but prefer zero dependencies.
+
+GAME THESIS:
+PREDICTED is a minimalist psychological strategy game where a lightweight adaptive agent observes the player's choices, predicts the player's next choice, and exposes that prediction to the player.
+
+The player's objective is not merely to maximize score.
+
+The player is trying to understand and manipulate the model the game has constructed of their behaviour.
+
+CORE GAMEPLAY:
+
+* Each turn presents three choices:
+  LEFT
+  CENTER
+  RIGHT
+* Each choice has a reward value.
+* Before the player chooses, the game displays its prediction of the player's next choice.
+* The prediction includes:
+  predicted choice
+  confidence percentage
+* The player then chooses one of the three options.
+* The selected option gives its displayed reward.
+* If the player deliberately chooses against a sufficiently confident prediction, award a BLUFF bonus.
+* After every choice, update the adaptive player model.
+* Continue until the run timer reaches zero.
+
+GAME FEEL:
+The player should gradually realize:
+"The game is learning how I play."
+
+Then the player should begin thinking:
+"Can I fool it?"
+
+The game should therefore create a cycle of:
+observe → predict → choose → reveal → learn → adapt.
+
+RUN LENGTH:
+Approximately 60 seconds for the first prototype.
+
+INPUT:
+Support both:
+
+* mouse/touch buttons
+* keyboard:
+  A = LEFT
+  S = CENTER
+  D = RIGHT
+
+PREDICTION SYSTEM:
+Implement a lightweight local player-modeling system in JavaScript.
+
+Do NOT pretend that this is machine learning or a large language model.
+
+Use simple adaptive logic based on:
+
+1. action frequency
+2. recent actions
+3. transition patterns
+4. recency weighting
+
+The model should output:
+
+* predicted action
+* confidence between approximately 33% and 90%
+
+The AI must remain imperfect.
+It must NOT become 100% accurate.
+The player must be able to deceive it.
+
+IMPORTANT BALANCE RULE:
+The player must not be able to discover a trivial strategy such as:
+"Always choose the opposite of the prediction."
+
+The prediction system should become somewhat more cautious when it detects that the player repeatedly betrays high-confidence predictions.
+
+REWARD SYSTEM:
+Each turn should offer three visibly different reward values.
+
+Example:
+LEFT: +10
+CENTER: +20
+RIGHT: +35
+
+Randomize the reward placement so the player cannot simply memorize one best lane.
+
+If the player chooses the AI prediction:
+award the normal reward.
+
+If the player chooses against a prediction whose confidence is at least 60%:
+award an additional BLUFF bonus.
+
+The stronger the prediction confidence, the larger the potential bluff bonus can be, within reasonable limits.
+
+FEEDBACK:
+When the player chooses:
+
+* show the selected choice
+* show the reward gained
+* show whether the prediction was correct
+* if the player defeated a high-confidence prediction, display:
+  BLUFF
+* animate the result clearly but minimally.
+
+Do not use excessive visual effects.
+
+UI:
+Minimalist, deliberate, modern interface.
+
+Use:
+
+* dark neutral background
+* clean typography
+* geometric panels
+* strong hierarchy
+* restrained animation
+* no external art
+
+The prototype should look intentional rather than like an unfinished coding demo.
+
+MAIN GAME SCREEN SHOULD SHOW:
+
+* PREDICTED title or small wordmark
+* current score
+* remaining time
+* current AI prediction
+* confidence meter
+* three choice cards/buttons
+* small history indicator showing recent decisions
+* current streak or bluff streak
+
+START SCREEN:
+Title:
+PREDICTED
+
+Subtitle:
+"The game is learning you."
+
+Short instruction:
+"Make choices. Watch what I learn."
+
+Button:
+PLAY
+
+Do not create a long tutorial.
+
+FIRST-SESSION TEACHING:
+The first several turns should initially hide some complexity.
+
+Start with simple predictions.
+
+After a few choices, reveal the confidence percentage clearly.
+
+The first high-confidence prediction should feel like an "aha" moment.
+
+END-OF-RUN:
+Show:
+
+* final score
+* number of choices
+* prediction accuracy
+* number of successful bluffs
+* bluff streak
+* a simple player archetype
+
+Possible archetypes:
+THE REPEATER
+THE GAMBLER
+THE CONTRARIAN
+THE OPPORTUNIST
+THE CAUTIOUS
+
+The archetype must be calculated from the player's actual run behaviour.
+
+Then show:
+"THE MACHINE HAS LEARNED YOU."
+
+Show a personalized next challenge based on the player's behaviour.
+
+Examples:
+
+* "Break your pattern 5 times."
+* "Follow the prediction 3 times."
+* "Avoid the highest reward 5 times."
+* "Defeat 3 high-confidence predictions."
+
+Provide:
+RUN AGAIN
+
+PERSISTENCE:
+Use localStorage.
+
+Persist:
+
+* number of runs
+* best score
+* archetype from previous run
+* recent behavioural statistics
+* current personalized challenge
+
+This is intended to support the Day-1 retention concept later.
+
+DO NOT BUILD YET:
+
+* accounts
+* multiplayer
+* achievements
+* cosmetics
+* currencies
+* shops
+* ads
+* leaderboards
+* character customization
+* complex progression
+* sound systems
+* procedural maps
+* narrative
+* external AI services
+
+This first version exists only to validate the core loop.
+
+CODE STRUCTURE:
+Prefer:
+index.html
+style.css
+script.js
+
+Keep the code readable and modular.
+
+Create functions/classes for:
+
+* game state
+* prediction model
+* scoring
+* player behaviour analysis
+* challenge generation
+* localStorage persistence
+* rendering/UI
+
+Make sure restarting the game correctly resets the current run while retaining persistent profile data.
+
+Before implementing, briefly inspect the requirements above and create a concise implementation plan.
+
+Then implement the complete playable prototype.
+
+After implementation:
+
+1. Run/test it.
+2. Check for console errors.
+3. Check that keyboard input works.
+4. Check that clicking works.
+5. Check that the timer ends the game correctly.
+6. Check that localStorage persists after refresh.
+7. Check that the prediction model updates after each turn.
+8. Check that BLUFF bonuses work.
+9. Check that the game can be opened as a static page.
+10. Do not add features outside the requested scope.
+
+IMPORTANT GAME-DESIGN PRIORITY:
+If you have a choice between making the game prettier and making the core prediction/bluff interaction clearer, choose the latter.
+
+Do not overbuild.
