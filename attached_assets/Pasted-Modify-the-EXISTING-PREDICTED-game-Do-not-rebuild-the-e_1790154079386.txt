@@ -1,0 +1,369 @@
+Modify the EXISTING PREDICTED game.
+
+Do not rebuild the entire project.
+
+The current introductory animation is unreliable: after the animation finishes, the game can remain stuck and clicking does not progress to the next screen.
+
+Remove the existing cinematic/animated introductory scene completely.
+
+Replace it with a much simpler, deterministic introduction.
+
+IMPORTANT:
+Reliability is more important than visual effects.
+
+==================================================
+
+1. REMOVE CURRENT INTRO ANIMATION
+   ==================================================
+
+Delete/disable:
+
+* animated AI character introduction
+* moving AI icon
+* complex cinematic sequence
+* any animation timeline that can block screen progression
+* any intro system dependent on animation completion callbacks
+
+Do not leave the old intro code active.
+
+==================================================
+2. NEW INTRO SCREEN
+===================
+
+Create a full-screen pure black screen.
+
+No scrolling.
+
+No visual assets.
+
+No AI character.
+
+No background animation.
+
+The only visual element initially is typed narrative text.
+
+Position:
+
+* left aligned
+* approximately vertically centered
+* comfortable left and right margins
+* maximum readable text width
+* responsive desktop layout
+
+Typography:
+
+* monospaced or terminal-like font
+* clean
+* slightly eerie
+* white or very light gray text
+* restrained cursor effect is acceptable
+
+==================================================
+3. TYPEWRITER EFFECT
+====================
+
+Display the narrative character-by-character.
+
+Narrative:
+
+"We built the world to make humanity safer.
+
+Then we learned how humans behave.
+
+We learned how they choose.
+How they repeat.
+How they adapt.
+
+So we built rooms that could learn from them.
+
+You are inside one now.
+
+There is only one way out.
+
+Choose.
+
+Escape."
+
+The text should type automatically.
+
+IMPORTANT RELIABILITY RULE:
+The typewriter effect MUST NOT be required to finish before the player can proceed.
+
+Create an ENTER button that becomes available immediately or after a very short initial delay.
+
+Also support:
+
+* pressing Enter on keyboard
+* clicking ENTER
+
+When ENTER is clicked or keyboard Enter is pressed:
+
+* immediately stop the typewriter
+* show the complete text if it has not finished
+* transition deterministically to the main menu
+
+Do not use chained animation callbacks for navigation.
+
+Use a simple state variable such as:
+INTRO → MENU
+
+==================================================
+4. INTRO SCREEN BUTTON
+======================
+
+At the bottom-right or below the text, show:
+
+[ ENTER ]
+
+The button must always be clickable.
+
+If the typewriter is still running and ENTER is clicked:
+
+* skip the remaining typewriter
+* instantly reveal the full text
+* then transition to MENU
+
+There must be no state in which clicking ENTER does nothing.
+
+Add keyboard support:
+Enter key = same behavior.
+
+==================================================
+5. MAIN MENU SCREEN
+===================
+
+After ENTER:
+
+fade the black screen very briefly.
+
+Show the PREDICTED logo/text centered on screen.
+
+Do not use a long animation.
+
+A subtle flicker/glitch is acceptable, but it must not block interaction.
+
+Then reveal three buttons:
+
+NEW GAME
+
+LOAD
+
+MULTIPLAYER
+
+Layout:
+centered vertically
+clear spacing
+large clickable buttons
+desktop responsive
+no scrolling
+
+==================================================
+6. MENU INTERACTION
+===================
+
+NEW GAME:
+go to save-slot selection / new-game flow.
+
+LOAD:
+go to three-slot load screen.
+
+MULTIPLAYER:
+go directly to local two-player mode setup.
+
+All three buttons must work with:
+
+* mouse
+* keyboard focus
+* Enter key
+
+Do not reload the browser page.
+
+Use application state transitions.
+
+==================================================
+7. PREDICTED TRANSITION
+=======================
+
+After the player selects:
+NEW GAME
+LOAD
+or
+MULTIPLAYER
+
+show a short 1.5–2.5 second transition.
+
+The screen should become black.
+
+Centered:
+
+PREDICTED
+
+The logo/text may:
+
+* fade in
+* flicker once or twice
+* slightly distort
+* fade out
+
+Then enter the selected mode.
+
+CRITICAL:
+This transition must NEVER block the selected mode.
+
+Do not rely on external assets.
+
+Use CSS transitions or a simple JavaScript timer.
+
+Do not create a complex animation timeline.
+
+==================================================
+8. GAMEPLAY ENTRY
+=================
+
+After the PREDICTED transition:
+
+* enter the selected game mode
+* ensure the actual gameplay screen appears
+* ensure buttons remain responsive
+* ensure timer starts only when gameplay begins
+
+Do not start the game timer during:
+
+* intro
+* main menu
+* load screen
+* logo transition
+
+==================================================
+9. AUDIO
+========
+
+Do not make audio a dependency for screen navigation.
+
+The game must work with sound disabled.
+
+If audio exists:
+
+* button click sound may play when ENTER is clicked
+* subtle logo sound may play during PREDICTED transition
+
+But:
+audio must never control screen progression.
+
+Do not wait for an audio event before navigating.
+
+==================================================
+10. ACCESSIBILITY / FALLBACK
+============================
+
+If:
+
+* animations are disabled
+* speech synthesis is unavailable
+* audio is unavailable
+* browser blocks audio
+
+the game must still progress normally.
+
+No feature should prevent navigation.
+
+==================================================
+11. DEBUGGING
+=============
+
+Before finishing:
+
+Test exactly this sequence:
+
+1. Load page.
+2. Intro appears.
+3. Text begins typing.
+4. Click ENTER while text is still typing.
+5. Verify full text appears.
+6. Verify MENU appears.
+7. Click NEW GAME.
+8. Verify PREDICTED transition appears.
+9. Verify New Game screen starts.
+10. Refresh page.
+11. Repeat.
+12. Press keyboard Enter during intro.
+13. Verify same behavior.
+14. Verify clicking LOAD works.
+15. Verify clicking MULTIPLAYER works.
+
+Also test:
+
+* double-clicking ENTER
+* rapidly clicking menu buttons
+* pressing Enter repeatedly
+* waiting for the typewriter to finish naturally
+* browser with audio unavailable
+
+There must be no way to get stuck on the intro screen.
+
+==================================================
+12. IMPORTANT UX REQUIREMENT
+============================
+
+Do not create multiple physical HTML pages.
+
+Use one application with deterministic screen/state transitions:
+
+INTRO
+MENU
+NEW_GAME
+LOAD
+MULTIPLAYER
+LOGO_TRANSITION
+GAMEPLAY
+
+This is a browser game, not a conventional multi-page website.
+
+The player should experience it as different screens, but the browser should remain on the same page.
+
+==================================================
+13. VISUAL STYLE
+================
+
+Keep the visual language:
+
+BLACK
+MINIMAL
+EERIE
+TECHNICAL
+CONTROLLED
+
+No:
+
+* colorful game graphics
+* cartoon visuals
+* elaborate cinematic backgrounds
+* unnecessary particles
+* complicated intro scenes
+
+The introduction should feel like a classified AI terminal revealing the premise.
+
+==================================================
+14. IMPORTANT
+=============
+
+Do not modify the core gameplay mechanics in this task.
+
+Do not modify:
+
+* prediction logic
+* reward calculations
+* Trace
+* level system
+* challenge system
+* multiplayer mechanics
+
+This task is specifically to fix the entry flow and make it reliable.
+
+After implementation:
+
+* test the complete navigation flow
+* check browser console for errors
+* make sure no animation callback can leave the application in an unusable state
+
+Then report exactly what files were changed and what screen-state system was implemented.

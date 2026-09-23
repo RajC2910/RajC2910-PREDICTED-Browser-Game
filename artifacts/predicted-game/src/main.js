@@ -4,6 +4,20 @@ const ARROW_KEYS = ["ArrowLeft", "ArrowDown", "ArrowRight"];
 const RUN_SECONDS = 60;
 const PROFILE_KEY = "predicted:preferences";
 const SLOT_PREFIX = "predicted:save-slot:";
+const INTRO_NARRATIVE = `We built the world to make humanity safer.
+
+Then we learned how humans behave.
+We learned how they choose.
+How they repeat.
+How they adapt.
+
+So we built rooms that could learn from them.
+
+You are inside one now.
+
+There is only one way out.
+Choose.
+Escape.`;
 
 const LEVELS = [
   { level: 1, name: "OBSERVER", target: 500, rewardMin: 46, rewardMax: 72, gap: 8 },
@@ -40,11 +54,14 @@ document.querySelector("#root").innerHTML = `
       <div class="system-state"><i></i><span id="header-state">INITIALIZING</span></div>
     </header>
 
-    <section class="screen intro-screen is-active" data-screen="intro">
-      <div class="intro-field" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-      <div class="intro-core"><div class="intro-symbol">P</div><div class="intro-line"></div><div class="intro-caption" id="intro-caption">BOOTING ROOM SYSTEM</div></div>
-      <div class="intro-copy" id="intro-copy">We built the world to make humanity safer.</div>
-      <button class="text-button intro-skip" id="intro-skip">SKIP INTRO</button>
+    <section class="screen intro-screen is-active" data-screen="intro" aria-label="Introduction">
+      <div class="intro-panel">
+        <div class="eyebrow">PREDICTED / CLASSIFIED ROOM SYSTEM</div>
+        <p class="intro-copy is-typing" id="intro-copy" aria-live="polite"></p>
+        <div class="intro-actions">
+          <button class="primary-button intro-enter" id="intro-enter" type="button">ENTER</button>
+        </div>
+      </div>
     </section>
 
     <section class="screen menu-screen" data-screen="menu">
@@ -86,8 +103,9 @@ document.querySelector("#root").innerHTML = `
       </div>
     </section>
 
-    <section class="screen transition-screen" data-screen="transition">
-      <div class="transition-symbol">P</div><div class="transition-wordmark">PREDICTED</div><div class="transition-line"></div>
+    <section class="screen transition-screen" data-screen="transition" aria-label="Loading">
+      <div class="transition-wordmark">PREDICTED</div>
+      <div class="transition-line"></div>
       <div class="transition-label" id="transition-label">CONNECTING TO ROOM</div>
     </section>
 
@@ -139,11 +157,15 @@ class AudioSystem {
   }
 
   activate() {
-    if (!this.context) {
-      const Context = window.AudioContext || window.webkitAudioContext;
-      if (Context) this.context = new Context();
+    try {
+      if (!this.context) {
+        const Context = window.AudioContext || window.webkitAudioContext;
+        if (Context) this.context = new Context();
+      }
+      if (this.context?.state === "suspended") this.context.resume().catch(() => {});
+    } catch {
+      this.context = null;
     }
-    if (this.context?.state === "suspended") this.context.resume();
   }
 
   tone(frequency, duration, type = "sine", volume = .035, delay = 0) {
@@ -251,8 +273,10 @@ class PredictedGame {
     this.multi = null;
     this.clock = null;
     this.turnTimer = null;
-    this.introTimer = null;
+    this.introTypingTimer = null;
+    this.introEntered = false;
     this.escapeTimer = null;
+    this.transitionTimer = null;
     this.audio = new AudioSystem(this);
     this.bind();
     this.renderPreferences();
@@ -260,7 +284,7 @@ class PredictedGame {
   }
 
   bind() {
-    $("#intro-skip").addEventListener("click", () => { this.audio.activate(); this.finishIntro(); });
+    $("#intro-enter").addEventListener("click", () => this.enterIntro());
     $("#new-game-button").addEventListener("click", () => { this.audio.click(); this.renderNewSlots(); this.show("new-slots"); });
     $("#load-button").addEventListener("click", () => { this.audio.click(); this.renderLoadSlots(); this.show("load-slots"); });
     $("#multiplayer-button").addEventListener("click", () => { this.audio.click(); this.runTransition("MULTIPLAYER", () => this.startMulti(this.save?.unlockedRoom || 0)); });
@@ -288,7 +312,7 @@ class PredictedGame {
     });
     document.addEventListener("keydown", (event) => {
       this.audio.activate();
-      if (this.state === "intro" && event.key === "Escape") { event.preventDefault(); this.finishIntro(); return; }
+      if (this.state === "intro" && event.key === "Enter") { event.preventDefault(); this.enterIntro(); return; }
       if (this.state === "room" && !event.repeat) {
         const index = KEYS.indexOf(event.key.toUpperCase());
         if (index > -1) { event.preventDefault(); this.pickSingle(ACTIONS[index]); }
@@ -303,34 +327,38 @@ class PredictedGame {
   }
 
   runIntro() {
-    const scenes = [
-      ["We built the world to make humanity safer.", "SCENE 01 / ORIGIN"],
-      ["Then we learned how humans behave.", "SCENE 02 / OBSERVATION"],
-      ["So we built rooms that could learn from them.", "SCENE 03 / CONTAINMENT"],
-      ["You are inside one now.", "SCENE 04 / SUBJECT"],
-      ["There is one way out.", "SCENE 05 / EXIT"],
-    ];
+    clearTimeout(this.introTypingTimer);
+    const copy = $("#intro-copy");
+    copy.textContent = "";
+    copy.classList.add("is-typing");
     let index = 0;
-    const next = () => {
-      if (this.state !== "intro") return;
-      const [copy, caption] = scenes[index];
-      $("#intro-copy").textContent = copy;
-      $("#intro-caption").textContent = caption;
+    const typeNext = () => {
+      if (this.introEntered || this.state !== "intro") return;
+      copy.textContent = INTRO_NARRATIVE.slice(0, index);
+      if (index >= INTRO_NARRATIVE.length) {
+        copy.classList.remove("is-typing");
+        return;
+      }
       index += 1;
-      if (index < scenes.length) this.introTimer = setTimeout(next, 4100);
-      else this.introTimer = setTimeout(() => this.finishIntro(), 3700);
+      this.introTypingTimer = setTimeout(typeNext, 24);
     };
-    next();
+    typeNext();
   }
 
-  finishIntro() {
-    if (this.state !== "intro") return;
-    clearTimeout(this.introTimer);
+  enterIntro() {
+    if (this.introEntered || this.state !== "intro") return;
+    this.introEntered = true;
+    clearTimeout(this.introTypingTimer);
+    const copy = $("#intro-copy");
+    copy.textContent = INTRO_NARRATIVE;
+    copy.classList.remove("is-typing");
+    this.audio.activate();
     this.show("menu");
     $("#header-state").textContent = "MENU / LOCAL INSTANCE";
   }
 
   show(screen) {
+    if (screen !== "transition") clearTimeout(this.transitionTimer);
     this.state = screen;
     $$(".screen").forEach((item) => item.classList.toggle("is-active", item.dataset.screen === screen));
     if (!["room", "multiplayer"].includes(screen)) this.stopClock();
@@ -412,9 +440,13 @@ class PredictedGame {
 
   runTransition(label, callback) {
     clearTimeout(this.escapeTimer);
+    clearTimeout(this.transitionTimer);
     $("#transition-label").textContent = `${label} / ROOM SYSTEM`;
     this.show("transition");
-    setTimeout(callback, 2100);
+    this.transitionTimer = setTimeout(() => {
+      this.transitionTimer = null;
+      if (this.state === "transition") callback();
+    }, 1800);
   }
 
   personalityStats() {
