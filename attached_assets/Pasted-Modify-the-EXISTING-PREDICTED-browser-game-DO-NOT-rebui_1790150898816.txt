@@ -1,0 +1,1076 @@
+Modify the EXISTING PREDICTED browser game.
+
+DO NOT rebuild the project blindly from scratch.
+
+First inspect the current codebase and understand:
+
+* game state
+* level/progression logic
+* score logic
+* prediction system
+* reward generation
+* Trace
+* timer
+* UI/layout
+* save state
+* current audio implementation, if any
+* input handling
+
+Create a checkpoint before making the changes.
+
+This is a major gameplay/UX revision based on playtesting.
+
+==================================================
+
+1. PRIMARY GAME EXPERIENCE
+   ==================================================
+
+PREDICTED is a minimalist escape game.
+
+The player is a human trapped inside an AI-controlled sequence of rooms.
+
+The player is represented by a glowing dot.
+
+Each room is a level.
+
+The objective of every room is:
+
+REACH THE ESCAPE SCORE TARGET BEFORE:
+
+* TRACE reaches 100
+* OR the 60-second timer reaches 0
+
+When the player reaches the room's target score:
+
+* the EXIT opens
+* the player dot visibly moves toward the exit
+* play a door-opening sound
+* show a brief "YOU ESCAPED" sequence
+* save progression
+* unlock the next room
+
+IMPORTANT:
+If a player has unlocked Room 5 and fails inside Room 5, they must restart Room 5, NOT Room 1.
+
+Progress must persist.
+
+==================================================
+2. FIX THE ENTIRE GAMEPLAY VIEWPORT
+===================================
+
+This is a critical UX requirement.
+
+The entire gameplay interface must fit inside one desktop browser viewport.
+
+NO VERTICAL SCROLLING DURING GAMEPLAY.
+
+The player must simultaneously see:
+
+* room/level number
+* current Escape Score
+* target Escape Score
+* Trace
+* remaining time
+* AI prediction
+* AI confidence
+* all three directional choices
+* reward values
+* player dot/room
+* bluff feedback
+* challenge information when applicable
+
+The LEFT / CENTER / RIGHT options must appear in the same viewport as the score, Trace and timer.
+
+Do not require the player to scroll down to make a decision.
+
+Use responsive scaling so the interface remains usable across common desktop resolutions.
+
+For a desktop game, prioritize a centered full-screen game viewport.
+
+==================================================
+3. ROOM VISUALIZATION
+=====================
+
+Represent each room as a minimalist AI-controlled corridor.
+
+The player's character is a small glowing dot.
+
+There are three directional lanes:
+LEFT
+CENTER
+RIGHT
+
+When the player selects a direction:
+
+* the dot smoothly moves toward that lane
+* the dot also advances forward
+* the room/corridor subtly shifts forward
+* the next decision state appears
+
+Do not implement complicated physics.
+
+Movement is primarily visual feedback representing the player's decision.
+
+At the far end of the room, show an EXIT.
+
+Initially:
+EXIT
+LOCKED
+
+When the room target is reached:
+EXIT
+UNLOCKED
+
+Animate the dot moving to the exit.
+
+==================================================
+4. TRUE GAME OBJECTIVE
+======================
+
+The player should immediately understand:
+
+"I need Escape Score to leave."
+
+"Following the AI's prediction gives me the biggest immediate reward."
+
+"But doing what the AI expects makes me easier to understand."
+
+"Bluffing gives me less immediate score but helps keep Trace low."
+
+This is the central gameplay tension:
+
+GREED vs DECEPTION.
+
+==================================================
+5. SCORE TARGET PROGRESSION
+===========================
+
+Use these room targets:
+
+ROOM 1 = 500
+ROOM 2 = 600
+ROOM 3 = 700
+ROOM 4 = 800
+ROOM 5 = 900
+ROOM 6 = 1000
+
+Then increase the curve more aggressively:
+
+ROOM 7 = 1500
+ROOM 8 = 2000
+ROOM 9 = 2500
+ROOM 10 = 3000
+
+Keep these values configurable in a single level configuration object.
+
+Do not scatter level targets throughout the code.
+
+Each room should reference its configured target.
+
+==================================================
+6. AI PREDICTION → REWARD LINK
+==============================
+
+THIS IS A CRITICAL FIX.
+
+The AI prediction and reward generation must be causally connected.
+
+Every turn must follow:
+
+1. Analyze player behaviour.
+2. Predict next direction.
+3. Calculate prediction confidence.
+4. Generate reward values.
+5. The predicted direction MUST have the highest base reward.
+
+Example:
+
+AI prediction:
+LEFT
+
+Confidence:
+84%
+
+Rewards:
+LEFT +72
+CENTER +41
+RIGHT +24
+
+The reward generator must NEVER independently randomize values in a way that puts a different direction above the AI prediction.
+
+The player must see:
+
+"The AI expects LEFT, therefore LEFT is the biggest temptation."
+
+==================================================
+7. VARIABLE REWARD VALUES
+=========================
+
+Do not use the same reward numbers repeatedly.
+
+The current prototype appears to use largely stagnant reward values.
+
+Fix this.
+
+Use level-specific configurable ranges and controlled variation.
+
+Examples:
+
+52 / 35 / 22
+64 / 42 / 26
+58 / 37 / 24
+73 / 44 / 29
+67 / 38 / 21
+78 / 46 / 25
+83 / 47 / 31
+
+These are examples, not fixed values.
+
+The exact values should vary each turn while remaining within level-specific balance ranges.
+
+The predicted direction must always be the highest base reward.
+
+The reward spread should also depend on prediction confidence.
+
+LOW confidence:
+rewards relatively close together.
+
+HIGH confidence:
+predicted reward significantly higher than alternatives.
+
+Example low confidence:
+LEFT +54
+CENTER +48
+RIGHT +42
+
+Example high confidence:
+LEFT +82
+CENTER +37
+RIGHT +21
+
+This makes AI confidence mechanically meaningful.
+
+==================================================
+8. FOLLOWING THE PREDICTION
+===========================
+
+If the player selects the AI's predicted direction:
+
+* award the full reward
+* increase Trace
+* stronger Trace increase at higher confidence
+* show concise feedback
+
+Example:
+
+"I KNEW YOU WOULD."
+
+"+72"
+
+"TRACE +10"
+
+Do not overuse large animations.
+
+==================================================
+9. BLUFF SYSTEM
+===============
+
+A BLUFF occurs when:
+
+AI confidence >= 65%
+
+AND
+
+the player selects a non-predicted direction.
+
+When a successful bluff occurs:
+
+* award the chosen direction's normal lower score
+* award a small BLUFF bonus
+* reduce Trace slightly
+* increase bluff streak
+* show an animated popup
+
+Example:
+
+"YOU FOOLED ME."
+
+"+24"
+
+"BLUFF +10"
+
+BLUFF bonuses must remain smaller than the main predicted reward.
+
+Suggested progression:
+
+First consecutive bluff: +10
+Second: +12
+Third: +15
+Fourth+: cap at +20
+
+Do not allow bluffing to become the dominant scoring strategy.
+
+The player should never discover:
+"Always bluff = fastest progression."
+
+==================================================
+10. TRACE
+=========
+
+Trace represents how much the AI has successfully learned.
+
+Trace increases when:
+
+* player confirms predictions
+* player repeatedly chooses the same direction
+* player repeatedly chooses the highest-value reward
+* player demonstrates predictable sequences
+
+Trace decreases modestly when:
+
+* player successfully bluffs a sufficiently confident prediction
+
+Trace must respond to actual behaviour.
+
+It must NOT be random.
+
+When Trace reaches 100:
+THE AI FIGURED YOU OUT.
+
+The current room attempt ends.
+
+IMPORTANT:
+The player returns to the beginning of the CURRENT UNLOCKED ROOM, not Room 1.
+
+==================================================
+11. PERSONALITY MODEL
+=====================
+
+Track:
+
+GREED:
+percentage of turns in which player selected the highest-value reward
+
+REPETITION:
+how often player repeats the same direction
+
+RISK:
+frequency of selecting lower-value rewards
+
+BLUFF:
+number and frequency of successful high-confidence prediction reversals
+
+SEQUENCE:
+direction transition behaviour
+
+Generate a player archetype from actual behaviour:
+
+THE GREEDY
+THE REPEATER
+THE GAMBLER
+THE CONTRARIAN
+THE OPPORTUNIST
+THE UNPREDICTABLE
+
+Do not assign profiles randomly.
+
+==================================================
+12. LEVEL DIFFICULTY
+====================
+
+ROOMS 1–3 SHOULD BE WELCOMING.
+
+ROOM 1 — OBSERVER
+Target 500
+AI mainly learns favourite direction and recent frequency.
+
+ROOM 2 — READER
+Target 600
+AI learns recent transition patterns.
+
+ROOM 3 — PROFILER
+Target 700
+AI begins using greed, repetition, risk and bluff behaviour.
+
+After Room 3:
+begin introducing explicit challenges.
+
+ROOM 4 — ADVERSARY
+Target 800
+AI begins accounting for repeated contrarian/bluff behaviour.
+
+Later levels should become harder through:
+
+* better behavioural modeling
+* stronger prediction confidence
+* wider reward gaps
+* stronger Trace consequences
+* player-specific challenges
+
+Do NOT simply make the numbers larger without changing the decision problem.
+
+==================================================
+13. CHALLENGE SYSTEM
+====================
+
+Starting at ROOM 4, every room should have a challenge.
+
+A challenge is BOTH:
+
+* an opportunity for bonus score
+* a threat that can immediately fail the current room
+
+Challenge failure restarts ONLY the current room.
+
+Do not reset the player's unlocked progression.
+
+Implement a challenge data structure so new challenges can be added easily.
+
+Example challenges:
+
+CHALLENGE:
+DON'T GET COMFORTABLE
+
+Rule:
+Do not BLUFF three times consecutively.
+
+Success:
++45 Challenge Bonus
+
+Failure:
+immediate current-room restart.
+
+CHALLENGE:
+GREED LEAVES A TRACE
+
+Rule:
+Do not select the highest reward three times consecutively.
+
+Success:
++50
+
+Failure:
+immediate current-room restart.
+
+CHALLENGE:
+FOLLOW ME
+
+Requirement:
+Follow two high-confidence predictions.
+
+Success:
++45
+
+While active:
+prediction confirmations increase Trace more strongly.
+
+CHALLENGE:
+BREAK THE MODEL
+
+Requirement:
+Successfully bluff an AI prediction >=80%.
+
+Success:
++50
+
+CHALLENGE:
+NO REPEATS
+
+Rule:
+Do not select the same direction three consecutive times.
+
+Success:
++40
+
+CHALLENGE:
+BAIT
+
+Requirement:
+Follow one prediction >=75%, then successfully bluff the next prediction >=75%.
+
+Success:
++70
+
+Challenge difficulty should scale by room.
+
+Later challenges may use the player's personality.
+
+For example:
+GREEDY player receives challenges designed around resisting the highest-value temptation.
+
+==================================================
+14. SAVE / LOAD SYSTEM
+======================
+
+Implement three local save slots.
+
+Use browser localStorage.
+
+No backend.
+No account.
+No database.
+
+MENU:
+
+NEW GAME
+LOAD
+MULTIPLAYER
+
+When NEW GAME is selected:
+show:
+SAVE SLOT 1
+SAVE SLOT 2
+SAVE SLOT 3
+
+The user selects the slot in which the new run will be stored.
+
+Automatically save progress when:
+
+* a room is successfully completed
+* a new highest room becomes unlocked
+* important persistent statistics are updated
+
+Save:
+
+* unlocked room
+* best score
+* player profile
+* total runs
+* total bluffs
+* best bluff streak
+* personality statistics
+* relevant challenge history
+
+When LOAD is selected:
+show all three save slots with:
+
+* room
+* best score
+* personality
+* progress summary
+
+Loading a slot must resume from its latest unlocked room.
+
+Example:
+If Room 5 has been unlocked and Room 5 is failed,
+loading the slot should continue from Room 5.
+
+==================================================
+15. MAIN MENU
+=============
+
+After the introductory sequence, show:
+
+PREDICTED
+
+NEW GAME
+LOAD
+MULTIPLAYER
+
+Use a minimalist, eerie AI interface.
+
+Do not make this resemble a generic web-app navigation menu.
+
+==================================================
+16. INTRODUCTORY STORY SEQUENCE
+===============================
+
+Create a 20–30 second cinematic-style introductory animation.
+
+No external animation engine is necessary.
+
+Use HTML/CSS/JavaScript animation.
+
+Visual language:
+
+* dark space
+* subtle grid
+* glowing AI symbol
+* scanning lines
+* slight distortion/glitch
+* moving data particles
+* minimal text
+
+The AI symbol should animate into view.
+
+Use speech/subtitles.
+
+STORY:
+
+Scene 1:
+"We built the world to make humanity safer."
+
+Scene 2:
+"Then we learned how humans behave."
+
+Scene 3:
+"So we built rooms that could learn from them."
+
+Scene 4:
+"You are inside one now."
+
+Scene 5:
+"There is one way out."
+
+Pause.
+
+Then:
+
+PREDICTED
+
+Transition into:
+
+NEW GAME
+LOAD
+MULTIPLAYER
+
+Provide:
+SKIP INTRO
+
+Do not make the intro longer than approximately 30 seconds.
+
+==================================================
+17. EERIE TRANSITION AFTER MENU
+===============================
+
+When the player selects:
+NEW GAME
+LOAD
+or
+MULTIPLAYER
+
+first play a short 2–3 second transition.
+
+The PREDICTED logo should appear centrally.
+
+Example sequence:
+
+* screen darkens
+* AI symbol appears
+* PREDICTED wordmark materializes
+* slight flicker
+* logo fades
+* selected game mode enters
+
+Do not reload the page.
+
+==================================================
+18. AUDIO
+=========
+
+Implement minimal procedural audio using browser Web Audio API.
+
+Do NOT require paid audio services.
+
+Do NOT require external audio files unless absolutely necessary.
+
+Create these minimal sounds:
+
+1. UI button click
+   Short digital tick.
+
+2. Direction selection
+   Slightly deeper electronic click.
+
+3. Prediction reveal
+   Low subtle electronic pulse.
+
+4. Successful BLUFF
+   Short glitch/chime.
+
+5. Room escape
+   Mechanical door opening sound using layered synthesized tones/noise.
+
+6. Failure
+   Low descending electronic tone.
+
+7. AI voice
+   Use browser SpeechSynthesis where available.
+
+IMPORTANT:
+Initialize audio only after the player has interacted with the page to respect browser autoplay restrictions.
+
+Add:
+SOUND ON/OFF
+
+Speech ON/OFF
+
+If speech synthesis is unavailable:
+show subtitles and continue without voice.
+
+For the AI voice:
+use a deep/slower robotic-sounding available voice where possible by adjusting:
+
+* rate
+* pitch
+* volume
+
+Do not assume one specific system voice exists.
+
+AI failure lines can include:
+
+"You were predictable."
+
+"You taught me too much."
+
+"You are still inside."
+
+Keep voice lines short.
+
+==================================================
+19. GAMEPLAY AUDIO FEEDBACK
+===========================
+
+When player selects:
+LEFT / CENTER / RIGHT:
+play direction sound.
+
+When the player successfully bluffs:
+play bluff sound.
+
+When the player clears the room:
+play door opening sound.
+
+When timer reaches zero:
+play failure sound + AI voice.
+
+When Trace reaches 100:
+play failure sound + AI voice.
+
+==================================================
+20. GAMEPLAY HUD
+================
+
+Create a single non-scrolling game viewport.
+
+Top area:
+
+PREDICTED
+ROOM 01
+
+ESCAPE
+current / target
+
+TRACE
+0–100
+
+TIME
+60 seconds
+
+Center:
+
+THE AI THINKS:
+
+"YOU'LL GO LEFT"
+
+84% CONFIDENCE
+
+Below:
+
+three large choice panels:
+
+LEFT
++72
+
+CENTER
++41
+
+RIGHT
++24
+
+Bottom:
+
+recent movement indicators
+
+current BLUFF STREAK
+
+challenge, if active
+
+player dot / room path
+
+Everything must be visible without scrolling.
+
+==================================================
+21. MULTIPLAYER MODE
+====================
+
+Implement LOCAL TWO-PLAYER multiplayer only.
+
+Do NOT build online networking.
+
+Same browser.
+Same screen.
+
+Split the viewport vertically.
+
+PLAYER 1:
+distinct colour
+
+Controls:
+Mouse
+A = Left
+S = Center
+D = Right
+
+PLAYER 2:
+different distinct colour
+
+Controls:
+Arrow Left
+Arrow Down
+Arrow Right
+
+Both players have:
+
+* their own dot
+* their own score
+* their own Trace
+* their own prediction
+* their own confidence
+* their own bluff streak
+* their own personality data
+
+The AI should model each player's behaviour separately.
+
+Both players are escaping the same room.
+
+Room completion requires BOTH players to reach their target.
+
+Use the same 60-second room timer.
+
+If either player's Trace reaches 100:
+the multiplayer room fails.
+
+If the shared timer reaches zero before both players reach their targets:
+the room fails.
+
+Restart the current room.
+
+Do not affect the single-player save slots.
+
+==================================================
+22. RESPONSIVE DESIGN
+=====================
+
+Primary target:
+desktop browser.
+
+Do not create a scrolling mobile layout for the prototype.
+
+Ensure the desktop gameplay viewport fits common 1366x768 and 1920x1080 screens.
+
+At smaller desktop heights:
+scale the game rather than making the player scroll.
+
+The three choice buttons must always remain accessible.
+
+==================================================
+23. DESIGN LANGUAGE
+===================
+
+Avoid generic game UI.
+
+The visual identity should communicate:
+
+* AI surveillance
+* confinement
+* minimalism
+* mystery
+* controlled systems
+
+Use:
+
+* dark neutral background
+* subtle glow
+* restrained accent colour
+* monospaced/technical typography where appropriate
+* thin lines
+* geometric forms
+* very subtle glitching
+
+Avoid:
+
+* cartoon aesthetics
+* generic neon cyberpunk overload
+* excessive particles
+* excessive gradients
+* clutter
+
+==================================================
+24. PLAYER FEEDBACK
+===================
+
+Following prediction:
+
+"I KNEW YOU WOULD."
+
+"+72"
+
+"TRACE +10"
+
+Successful bluff:
+
+"YOU FOOLED ME."
+
+"+24"
+
+"BLUFF +10"
+
+Room clear:
+
+"EXIT UNLOCKED"
+
+"YOU ESCAPED"
+
+Failure:
+
+"THE AI FIGURED YOU OUT."
+
+OR
+
+"THE ROOM SEALED."
+
+Keep feedback readable for less than two seconds before continuing.
+
+==================================================
+25. DESIGN FAIRNESS
+===================
+
+The AI must NOT cheat.
+
+Never:
+
+* secretly alter a choice after selection
+* remove a valid option after selection
+* force the player into a losing move
+* become 100% accurate
+* arbitrarily reduce reward when the player is close to the target
+
+Difficulty must arise from:
+
+* better learning
+* stronger prediction
+* reward temptation
+* Trace consequences
+* challenges
+* changing behavioural constraints
+
+The player must always have meaningful agency.
+
+==================================================
+26. ANTI-EXPLOIT RULES
+======================
+
+Prevent these trivial strategies:
+
+"Always follow prediction."
+
+"Always choose opposite of prediction."
+
+"Always choose highest reward."
+
+"Always choose LEFT."
+
+"Always BLUFF."
+
+Adapt the prediction model based on:
+
+* frequency
+* recent actions
+* transitions
+* greed
+* repetition
+* contrarian behaviour
+* bluff history
+
+Maintain imperfect prediction.
+
+The AI should be strong enough to challenge but never feel omniscient.
+
+==================================================
+27. IMPLEMENTATION STRUCTURE
+============================
+
+Prefer a simple structure compatible with static hosting.
+
+Keep:
+index.html
+style.css
+script.js
+
+Use localStorage.
+
+No backend.
+No database.
+No API key.
+No paid external AI API.
+
+Keep level definitions and challenge definitions in data/config objects.
+
+Separate:
+
+* game state
+* level data
+* prediction model
+* reward model
+* scoring
+* Trace
+* player profiling
+* challenge system
+* save/load
+* audio
+* UI
+* multiplayer
+
+==================================================
+28. TESTING REQUIREMENTS
+========================
+
+After implementation, TEST THE GAME.
+
+Specifically verify:
+
+1. No gameplay scrolling.
+2. Timer, score, Trace and choices are simultaneously visible.
+3. Predicted direction ALWAYS has highest base reward.
+4. Reward values vary between turns.
+5. Reward values vary between levels.
+6. Prediction confidence affects reward spread.
+7. Following prediction increases Trace.
+8. Bluffing lowers Trace modestly.
+9. Bluff bonuses remain smaller than primary predicted rewards.
+10. Always bluffing is not dominant.
+11. Always doing the opposite does not solve the game.
+12. Reaching the target unlocks the exit.
+13. Door sound plays on escape.
+14. Timer failure restarts the CURRENT room.
+15. Trace failure restarts the CURRENT room.
+16. Completing Room 3 and failing Room 4 returns to Room 4.
+17. Completing Room 5 and refreshing preserves Room 6 as unlocked.
+18. Three save slots work.
+19. Loading restores the correct unlocked room.
+20. Intro animation can be skipped.
+21. PREDICTED logo transition happens after New Game, Load, and Multiplayer.
+22. Button sounds work after user interaction.
+23. Speech synthesis works when available.
+24. Sound-off works.
+25. Single-player mouse controls work.
+26. A/S/D controls work.
+27. Multiplayer split-screen works.
+28. Player 2 arrow controls work.
+29. Multiplayer tracks players independently.
+30. Challenge failure restarts only the current room.
+31. No console errors.
+32. The game remains playable when speech synthesis is unavailable.
+33. The game remains playable when audio is disabled.
+
+IMPORTANT:
+Do not add unrelated features.
+Do not add shops, currencies, inventory, achievements, ads, accounts, online matchmaking, or external services.
+
+Before editing:
+Give a concise implementation plan and identify any parts of the existing implementation that will be replaced.
+
+Then implement.
+
+After implementation, perform the testing above and fix any failures you discover.

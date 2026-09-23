@@ -1,0 +1,638 @@
+Modify the existing PREDICTED browser game rather than starting from scratch.
+
+This is a focused redesign of the gameplay loop.
+
+CORE EXPERIENCE
+
+PREDICTED is a minimalist browser escape game.
+
+The player is a human represented by a small glowing dot trapped inside an AI-controlled room.
+
+Each room is a level.
+
+The AI controls the room by observing the player's behaviour, predicting the player's next movement direction, and deliberately making its predicted direction the most rewarding option.
+
+The player's objective is:
+
+REACH THE ROOM'S TARGET SCORE AND ESCAPE BEFORE THE AI FULLY FIGURES YOU OUT.
+
+The game is therefore about:
+
+GREED vs DECEPTION.
+
+The player wants immediate score but must remain unpredictable.
+
+ROOM STRUCTURE
+
+Each level is represented visually as an AI-controlled corridor/room with three movement lanes:
+
+LEFT
+CENTER
+RIGHT
+
+The player is represented by a dot.
+
+Whenever the player chooses LEFT, CENTER, or RIGHT:
+
+* the dot visibly moves toward that lane
+* then moves forward through the room
+* the room/corridor advances visually
+* the next decision state appears
+
+The physical movement is primarily visual feedback for the decision system; do not build complicated physics.
+
+At the end of each room is an EXIT.
+
+The EXIT begins locked.
+
+When the player reaches the target score, the EXIT becomes unlocked and the dot should visibly move toward it.
+
+GAME OBJECTIVE
+
+Every room has:
+
+* a target SCORE
+* a TRACE meter
+* a 60-second timer
+
+For the first three levels:
+
+LEVEL 1:
+Target = 800
+
+LEVEL 2:
+Target = 1100
+
+LEVEL 3:
+Target = 1500
+
+If SCORE reaches the room target:
+
+* level is completed
+* EXIT opens
+* show a brief escape animation
+* show room completion statistics
+* proceed to the next level
+
+If TRACE reaches 100:
+
+* show "THE AI FIGURED YOU OUT"
+* current run ends
+* return to Level 1
+
+If the timer reaches 0 before the target score is reached:
+
+* show "TIME EXPIRED"
+* current run ends
+* return to Level 1
+
+IMPORTANT:
+Normal run failure resets the complete run.
+
+ROOM-SPECIFIC CHALLENGE FAILURE, introduced after Level 3, resets only the current room.
+
+CORE TURN
+
+Every decision turn follows exactly this order:
+
+1. Read the player model.
+2. Generate the AI prediction.
+3. Generate the confidence.
+4. Generate the reward values based on the prediction and confidence.
+5. Display the prediction and reward values.
+6. Allow player input.
+7. Move the player dot.
+8. Award score.
+9. Change TRACE.
+10. Award BLUFF bonus if applicable.
+11. Update the player model.
+12. Update personality statistics.
+13. Generate the next decision.
+
+The reward system MUST NOT be generated independently of the prediction.
+
+PREDICTION-REWARD RELATIONSHIP
+
+The predicted direction MUST always be the highest-value base reward.
+
+Example:
+
+AI:
+"I THINK YOU'LL GO LEFT"
+
+Confidence:
+84%
+
+Rewards:
+
+LEFT +65
+CENTER +35
+RIGHT +20
+
+The player should clearly understand that the AI is tempting them with the option it believes they will choose.
+
+CONFIDENCE AND REWARD SPREAD
+
+AI confidence should affect reward spread.
+
+Low confidence example:
+
+LEFT +50
+CENTER +44
+RIGHT +38
+
+High confidence example:
+
+LEFT +85
+CENTER +30
+RIGHT +18
+
+The exact values can vary within sensible limits.
+
+The predicted direction must always have the highest base reward.
+
+FOLLOWING THE PREDICTION
+
+If the player follows the predicted direction:
+
+* award the full predicted reward
+* increase TRACE
+* display feedback such as:
+
+"I KNEW YOU WOULD."
+
+"+65 SCORE"
+
+"TRACE +10"
+
+Trace increase should be influenced by prediction confidence.
+
+Higher-confidence confirmations should increase TRACE more.
+
+BLUFF SYSTEM
+
+A BLUFF happens when:
+
+AI confidence >= 65%
+
+AND
+
+the player chooses a direction other than the prediction.
+
+When a successful bluff occurs:
+
+* award the chosen direction's normal lower reward
+* award a small BLUFF bonus
+* reduce TRACE slightly
+* display a prominent temporary feedback popup:
+
+"YOU FOOLED ME"
+
+"BLUFF +10"
+
+The BLUFF bonus must remain smaller than the normal predicted reward.
+
+Suggested bonus progression:
+
+First consecutive successful bluff:
++10
+
+Second:
++12
+
+Third:
++15
+
+Fourth and later:
+cap at +20
+
+Do not allow bluff bonuses to become the dominant scoring strategy.
+
+BLUFF bonus should slightly increase the player's sense of mastery, while the primary score progression still comes from high-value choices.
+
+TRACE SYSTEM
+
+TRACE represents how much the AI has learned about the player.
+
+TRACE should increase when:
+
+* player confirms a prediction
+* player repeats behaviours
+* player consistently chooses highest-value rewards
+* player demonstrates consistent directional patterns
+
+TRACE should decrease slightly when:
+
+* player successfully bluffs a sufficiently confident prediction
+
+TRACE must be behaviour-driven rather than random.
+
+PLAYER PROFILE
+
+Track at minimum:
+
+GREED:
+percentage of choices where player selects the highest available reward
+
+REPETITION:
+percentage of repeated direction choices
+
+RISK:
+frequency of selecting lower-value options
+
+BLUFF:
+successful high-confidence prediction reversals
+
+SEQUENCE:
+transition tendencies between directions
+
+At the end of every room show a compact player profile.
+
+Possible archetypes:
+
+THE GREEDY
+THE REPEATER
+THE GAMBLER
+THE CONTRARIAN
+THE OPPORTUNIST
+THE UNPREDICTABLE
+
+The profile must come from actual statistics rather than random assignment.
+
+AI EVOLUTION
+
+LEVEL 1 — OBSERVER
+
+AI mainly learns:
+
+* favourite direction
+* recent direction frequency
+
+Target:
+800
+
+Purpose:
+Teach the player that the AI is observing them.
+
+LEVEL 2 — READER
+
+AI additionally learns:
+
+* transitions
+* recent sequences
+
+Example:
+After LEFT, the player tends to choose RIGHT.
+
+Target:
+1100
+
+Purpose:
+Teach the player that the AI remembers patterns.
+
+LEVEL 3 — PROFILER
+
+AI additionally uses:
+
+* greed
+* repetition
+* risk
+* bluff frequency
+
+Target:
+1500
+
+Purpose:
+Teach the player:
+"The AI understands how I behave."
+
+After Level 3, introduce the Challenge System.
+
+LEVEL 4 — ADVERSARY
+
+Target:
+2000
+
+AI should begin accounting for deliberate bluffing/contrarian behaviour.
+
+Do not make the AI omniscient.
+
+It must remain imperfect and beatable.
+
+AI CONSTRAINT PHILOSOPHY
+
+The AI should not feel like it is cheating.
+
+Its power should come from:
+
+* better observation
+* stronger pattern recognition
+* more dangerous temptations
+* adaptive reward structures
+* increasingly restrictive room challenges
+
+It should NOT:
+
+* secretly remove valid player choices
+* change outcomes after the player chooses
+* force random failure
+* become 100% accurate
+
+The player's decisions must always remain meaningful.
+
+CHALLENGE SYSTEM
+
+Beginning after Level 3, every room includes a room challenge.
+
+A challenge is simultaneously:
+
+* an OPPORTUNITY for bonus rewards
+* a THREAT because violating its rule causes the current room to fail
+
+Challenge success grants bonus points.
+
+Challenge failure immediately ends the current room and restarts that room.
+
+Do not reset the whole run when a challenge is failed.
+
+Example Challenge 1:
+
+"DON'T GET COMFORTABLE"
+
+Rule:
+The player cannot perform three consecutive successful BLUFFS.
+
+If the player reaches a third consecutive successful bluff:
+CHALLENGE FAILED
+restart current room.
+
+If the player completes the room without violating the rule:
++40 Challenge Bonus
+
+Example Challenge 2:
+
+"GREED IS VISIBLE"
+
+Rule:
+The player cannot choose the highest-value direction three times consecutively.
+
+Success:
++50
+
+Failure:
+restart current room.
+
+Example Challenge 3:
+
+"PLAY ALONG"
+
+Requirement:
+Successfully follow two high-confidence predictions in the room.
+
+Success:
++45 Challenge Bonus.
+
+During this challenge, prediction confirmations increase TRACE more strongly.
+
+Example Challenge 4:
+
+"FALSE CONFIDENCE"
+
+Requirement:
+Successfully bluff at least one prediction above 80% confidence.
+
+Success:
++45
+
+Example Challenge 5:
+
+"DON'T REPEAT YOURSELF"
+
+Rule:
+Cannot choose the same direction three times consecutively.
+
+Success:
++35
+
+Challenge difficulty must scale with room level.
+
+Challenges should directly interact with:
+
+* BLUFF frequency
+* TRACE
+* reward risk
+* player personality
+* AI prediction confidence
+
+UI
+
+The main gameplay interface should clearly show:
+
+PREDICTED
+
+ROOM / LEVEL NUMBER
+
+SCORE:
+current / target
+
+TRACE:
+0–100
+
+TIME:
+60 seconds
+
+AI MESSAGE:
+"I THINK YOU'LL GO LEFT"
+
+CONFIDENCE:
+84%
+
+THREE CHOICES:
+
+LEFT +65
+CENTER +35
+RIGHT +20
+
+The visual connection between prediction and highest reward must be obvious.
+
+PLAYER MOVEMENT
+
+When player selects:
+LEFT:
+dot moves left and forward
+
+CENTER:
+dot moves center and forward
+
+RIGHT:
+dot moves right and forward
+
+Each movement should feel satisfying but remain lightweight.
+
+Use simple geometric animations.
+
+START SCREEN
+
+PREDICTED
+
+"YOU ARE INSIDE."
+
+"Every room is controlled by the AI."
+
+"Reach the score required to escape."
+
+"The more predictable you become, the harder it gets."
+
+Button:
+ENTER ROOM
+
+LEVEL COMPLETE
+
+Show:
+ESCAPED
+
+ROOM X CLEARED
+
+Score
+Trace
+Bluffs
+Prediction Accuracy
+Player Profile
+Challenge result, if applicable
+
+Then:
+NEXT ROOM
+
+RUN FAILURE
+
+If Trace reaches 100:
+
+"THE AI FIGURED YOU OUT."
+
+"YOUR PROFILE IS COMPLETE."
+
+RETURN TO LEVEL 1
+
+If timer reaches zero:
+
+"THE ROOM SEALED."
+
+"YOU RAN OUT OF TIME."
+
+RETURN TO LEVEL 1
+
+CHALLENGE FAILURE
+
+If a room challenge is violated:
+
+"THE ROOM CAUGHT YOU."
+
+"CHALLENGE FAILED."
+
+RESTART CURRENT ROOM
+
+PERSISTENCE
+
+Use localStorage for:
+
+* highest room reached
+* best total score
+* total runs
+* total successful bluffs
+* best bluff streak
+* player personality statistics
+
+Do not create:
+accounts
+backend
+database
+paid API
+external AI API
+multiplayer
+shops
+currencies
+ads
+cosmetics
+inventory
+
+TECHNICAL REQUIREMENTS
+
+Keep the project:
+index.html
+style.css
+script.js
+
+Use vanilla JavaScript.
+
+No framework is required for this prototype.
+
+Implement the adaptive AI locally.
+
+Recommended prediction model:
+
+* weighted recent action frequency
+* transition table
+* recency weighting
+* simple greed score
+* simple bluff/contrarian tendency
+
+The model should be explainable and deterministic enough to document.
+
+Do not call this a neural network or large language model.
+
+BALANCING REQUIREMENTS
+
+The player should NOT be able to:
+
+* always follow predictions and trivially win
+* always bluff and trivially win
+* always choose one direction and trivially win
+* discover a simple "always choose opposite" solution
+
+The AI should therefore adapt to:
+
+* greed
+* repetition
+* contrarian behaviour
+
+The first three levels should be relatively welcoming.
+
+After Level 3, difficulty should increase through:
+
+* stronger predictions
+* larger reward gaps when confidence is high
+* stronger TRACE consequences
+* more sophisticated behavioural modeling
+* room challenges
+
+Do not simply multiply enemy difficulty or reduce reward randomly.
+
+DESIGN PRIORITY
+
+The player must understand:
+
+1. I need points to escape.
+2. The AI prediction has the highest immediate reward.
+3. Following the prediction makes me easier to understand.
+4. Bluffing sacrifices immediate score but protects me.
+5. The AI learns how I play.
+6. Later rooms impose additional rules designed around my behaviour.
+
+If any visual or system element does not help communicate those six ideas, do not add it.
+
+After implementation:
+
+* test multiple runs
+* verify predicted option is always highest value
+* verify reward generation depends on prediction
+* verify TRACE responds to real behaviour
+* verify bluff bonuses work and remain smaller than predicted rewards
+* verify level targets trigger escape
+* verify dot movement works
+* verify timer failure
+* verify Trace failure
+* verify challenge failure resets only the current room
+* verify player profile reflects actual statistics
+* verify localStorage
+* check console errors
+* make sure the game remains usable with mouse and keyboard
