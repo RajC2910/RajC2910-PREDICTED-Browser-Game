@@ -4,6 +4,7 @@ const ARROW_KEYS = ["ArrowLeft", "ArrowDown", "ArrowRight"];
 const RUN_SECONDS = 60;
 const PROFILE_KEY = "predicted:preferences";
 const SLOT_PREFIX = "predicted:save-slot:";
+const MULTI_SLOT_PREFIX = "predicted:multi-save-slot:";
 const INTRO_NARRATIVE = `We built the world to make humanity safer.
 
 Then we learned how humans behave.
@@ -103,6 +104,16 @@ document.querySelector("#root").innerHTML = `
       </div>
     </section>
 
+    <section class="screen slot-screen multi-slot-screen" data-screen="multi-slots">
+      <div class="subscreen">
+        <button class="text-button back-button" data-back="menu">← BACK</button>
+        <div class="eyebrow">MULTIPLAYER / TWO-PLAYER LOCAL MEMORY</div>
+        <h1 class="subscreen-title">TWO PLAYERS.<br><span>ONE MEMORY.</span></h1>
+        <p class="slot-screen-copy">Multiplayer progression is separate from single-player. Pick one of three local slots.</p>
+        <div class="slot-grid" id="multi-slot-grid"></div>
+      </div>
+    </section>
+
     <section class="screen transition-screen" data-screen="transition" aria-label="Loading">
       <div class="transition-wordmark">PREDICTED</div>
       <div class="transition-line"></div>
@@ -139,7 +150,7 @@ document.querySelector("#root").innerHTML = `
 
     <section class="screen multiplayer-screen" data-screen="multiplayer"><div class="multi-shell"><div class="game-topline"><div class="game-slot">LOCAL TWO-PLAYER / SAME ROOM</div><button class="text-button exit-game" id="exit-multi">MENU</button></div><div class="multi-hud"><div><div class="hud-label">ROOM</div><div class="hud-value" id="multi-level">01</div></div><div class="timer-block"><div class="hud-label">SHARED TIME</div><div class="timer" id="multi-timer">01:00</div><div class="timer-track"><span class="timer-fill" id="multi-timer-fill"></span></div></div><div><div class="hud-label">TARGET</div><div class="hud-value" id="multi-target">500</div></div></div><div class="multi-corridor corridor" id="multi-corridor"><div class="corridor-depth"></div><div class="exit-gate"><div class="exit-label">EXIT / LOCKED</div></div><div class="multi-dot multi-dot-one"></div><div class="multi-dot multi-dot-two"></div><div class="corridor-status">TWO SIGNALS / ONE EXIT</div></div><div class="multi-grid" id="multi-grid"></div></div></section>
     <section class="screen result-screen" data-screen="multi-result"><div class="result-layout"><div><div class="result-kicker">LOCAL TWO-PLAYER / BOTH SIGNALS CLEAR</div><h1 class="result-title">BOTH<br><span>ESCAPED.</span></h1><p class="result-lead">The room could not close before either player reached the target.</p><div class="result-actions"><button class="primary-button" id="multi-again-button">PLAY AGAIN</button><button class="text-button" id="multi-menu-button">MENU</button></div></div><div class="stats-panel" id="multi-result-stats"></div></div></section>
-    <section class="screen result-screen failure-screen" data-screen="multi-fail"><div class="result-layout"><div><div class="result-kicker">LOCAL TWO-PLAYER / ROOM SEALED</div><h1 class="result-title fail-title">THE ROOM<br><span>WON.</span></h1><p class="result-lead fail-copy">Both players need to reach the target. One signal became too legible or the shared clock ran out.</p><div class="failure-detail" id="multi-fail-detail"></div><div class="result-actions"><button class="primary-button" id="multi-retry-button">RESTART ROOM</button><button class="text-button" id="multi-fail-menu-button">MENU</button></div></div><div class="stats-panel"><div class="stat-label">NO SINGLE-PLAYER SAVE CHANGED</div><div class="big-score" id="multi-fail-room">01</div><div class="result-note">LOCAL MATCH STATE ONLY</div></div></div></section>
+    <section class="screen result-screen failure-screen" data-screen="multi-fail"><div class="result-layout"><div><div class="result-kicker">LOCAL TWO-PLAYER / ROOM SEALED</div><h1 class="result-title fail-title">THE ROOM<br><span>WON.</span></h1><p class="result-lead fail-copy">Both players need to reach the target. One signal became too legible or the shared clock ran out.</p><div class="failure-detail" id="multi-fail-detail"></div><div class="result-actions"><button class="primary-button" id="multi-retry-button">RESTART ROOM</button><button class="text-button" id="multi-fail-menu-button">MENU</button></div></div><div class="stats-panel"><div class="stat-label">SINGLE-PLAYER SAVE UNTOUCHED</div><div class="big-score" id="multi-fail-room">01</div><div class="result-note">LOCAL MATCH STATE ONLY</div></div></div></section>
   </main>
 `;
 
@@ -269,6 +280,8 @@ class PredictedGame {
     this.level = LEVELS[0];
     this.currentSlot = null;
     this.save = null;
+    this.multiSlot = null;
+    this.multiSave = null;
     this.single = null;
     this.multi = null;
     this.clock = null;
@@ -287,7 +300,7 @@ class PredictedGame {
     $("#intro-enter").addEventListener("click", () => this.enterIntro());
     $("#new-game-button").addEventListener("click", () => { this.audio.click(); this.renderNewSlots(); this.show("new-slots"); });
     $("#load-button").addEventListener("click", () => { this.audio.click(); this.renderLoadSlots(); this.show("load-slots"); });
-    $("#multiplayer-button").addEventListener("click", () => { this.audio.click(); this.runTransition("MULTIPLAYER", () => this.startMulti(this.save?.unlockedRoom || 0)); });
+    $("#multiplayer-button").addEventListener("click", () => { this.audio.click(); this.renderMultiSlots(); this.show("multi-slots"); });
     $("#sound-toggle").addEventListener("click", () => this.audio.toggleSound());
     $("#speech-toggle").addEventListener("click", () => this.audio.toggleSpeech());
     $$(".back-button").forEach((button) => button.addEventListener("click", () => { this.audio.click(); this.show(button.dataset.back); }));
@@ -307,6 +320,8 @@ class PredictedGame {
     document.addEventListener("click", (event) => {
       const button = event.target.closest(".multi-choice");
       if (button) this.pickMulti(Number(button.dataset.player), button.dataset.action);
+      const multiSlotButton = event.target.closest("[data-multi-slot-action]");
+      if (multiSlotButton) this.selectMultiSlot(Number(multiSlotButton.dataset.slot), multiSlotButton.dataset.multiSlotAction);
       const slotButton = event.target.closest("[data-slot-action]");
       if (slotButton) this.selectSlot(Number(slotButton.dataset.slot), slotButton.dataset.slotAction);
     });
@@ -392,9 +407,60 @@ class PredictedGame {
 
   readSlot(slot) {
     try {
-      const stored = JSON.parse(localStorage.getItem(`${SLOT_PREFIX}${slot}`));
+      const stored = JSON.parse(localStorage.getItem(`\${SLOT_PREFIX}\${slot}`));
       return stored ? { ...this.defaultSave(slot), ...stored, personality: { ...this.defaultSave(slot).personality, ...(stored.personality || {}) } } : null;
     } catch { return null; }
+  }
+
+  defaultMultiSave(slot) {
+    return {
+      slot,
+      unlockedRoom: 0,
+      totalMatches: 0,
+      bestCombinedScore: 0,
+      lastPlayed: "NEW SLOT",
+    };
+  }
+
+  readMultiSlot(slot) {
+    try {
+      const stored = JSON.parse(localStorage.getItem(`\${MULTI_SLOT_PREFIX}\${slot}`));
+      return stored ? { ...this.defaultMultiSave(slot), ...stored } : null;
+    } catch { return null; }
+  }
+
+  writeMultiSlot() {
+    if (!this.multiSlot || !this.multiSave) return;
+    this.multiSave.lastPlayed = new Date().toISOString().slice(0, 10);
+    try { localStorage.setItem(`\${MULTI_SLOT_PREFIX}\${this.multiSlot}`, JSON.stringify(this.multiSave)); } catch {}
+  }
+
+  multiSlotCard(slot) {
+    const save = this.readMultiSlot(slot);
+    if (!save) {
+      return `<article class="slot-card is-empty multi-slot-card"><div class="slot-number">0\${slot}</div><div><div class="slot-title">MULTIPLAYER SLOT \${slot}</div><div class="slot-copy">EMPTY LOCAL MEMORY / START AT ROOM 01</div></div><button class="secondary-button" data-multi-slot-action="new" data-slot="\${slot}">NEW MATCH</button></article>`;
+    }
+    return `<article class="slot-card multi-slot-card"><div class="slot-number">0\${slot}</div><div class="slot-details"><div class="slot-title">MULTIPLAYER SLOT \${slot}</div><div class="slot-copy">ROOM \${pad(save.unlockedRoom + 1)} / BEST \${save.bestCombinedScore}</div><div class="slot-copy">\${save.totalMatches} MATCHES / \${save.lastPlayed}</div></div><div class="slot-actions"><button class="secondary-button" data-multi-slot-action="load" data-slot="\${slot}">LOAD</button><button class="text-button" data-multi-slot-action="new" data-slot="\${slot}">RESET</button></div></article>`;
+  }
+
+  renderMultiSlots() {
+    $("#multi-slot-grid").innerHTML = [1, 2, 3].map((slot) => this.multiSlotCard(slot)).join("");
+  }
+
+  selectMultiSlot(slot, action) {
+    this.audio.click();
+    if (action === "new") {
+      this.multiSlot = slot;
+      this.multiSave = this.defaultMultiSave(slot);
+      this.writeMultiSlot();
+      this.runTransition("MULTIPLAYER", () => this.startMulti(0, true));
+      return;
+    }
+    const loaded = this.readMultiSlot(slot);
+    if (!loaded) return;
+    this.multiSlot = slot;
+    this.multiSave = loaded;
+    this.runTransition("LOAD MULTIPLAYER", () => this.startMulti(this.multiSave.unlockedRoom || 0, false));
   }
 
   writeSlot() {
@@ -823,10 +889,18 @@ class PredictedGame {
     return { name, keySet, color: name === "PLAYER 1" ? "one" : "two", model: new PredictionModel(), score: 0, trace: 0, actions: [], predictionHits: 0, bluffs: 0, bluffStreak: 0, highestChoices: 0, lowerChoices: 0, rewards: {}, prediction: null, locked: false };
   }
 
-  startMulti(index) {
+  startMulti(index = 0, newMatch = false) {
     this.mode = "multi";
+    if (!this.multiSave) {
+      this.multiSlot = this.multiSlot || 1;
+      this.multiSave = this.readMultiSlot(this.multiSlot) || this.defaultMultiSave(this.multiSlot);
+    }
     this.levelIndex = clamp(index, 0, LEVELS.length - 1);
     this.level = LEVELS[this.levelIndex];
+    if (newMatch) {
+      this.multiSave.totalMatches = (this.multiSave.totalMatches || 0) + 1;
+      this.writeMultiSlot();
+    }
     this.multi = { players: [this.createMultiPlayer("PLAYER 1", KEYS), this.createMultiPlayer("PLAYER 2", ARROW_KEYS)] };
     this.show("multiplayer");
     $("#multi-level").textContent = pad(this.level.level);
@@ -834,7 +908,8 @@ class PredictedGame {
     $("#multi-timer").textContent = "01:00";
     $("#multi-timer-fill").style.transform = "scaleX(1)";
     this.renderMulti();
-    this.multi.players.forEach((_, index) => this.nextMultiTurn(index));
+    this.multi.players.forEach((_, playerIndex) => this.nextMultiTurn(playerIndex));
+    this.renderMulti();
     this.startClock();
   }
 
@@ -899,9 +974,14 @@ class PredictedGame {
   }
 
   completeMulti() {
+    if (this.state !== "multiplayer") return;
     this.stopClock();
     this.audio.door();
-    $("#multi-result-stats").innerHTML = this.multi.players.map((player) => `<div class="multi-result-row"><span>${player.name}</span><strong>${player.score}</strong><small>TRACE ${player.trace} / BLUFFS ${player.bluffs}</small></div>`).join("");
+    const combinedScore = this.multi.players.reduce((sum, player) => sum + player.score, 0);
+    this.multiSave.unlockedRoom = Math.max(this.multiSave.unlockedRoom || 0, Math.min(LEVELS.length - 1, this.levelIndex + 1));
+    this.multiSave.bestCombinedScore = Math.max(this.multiSave.bestCombinedScore || 0, combinedScore);
+    this.writeMultiSlot();
+    $("#multi-result-stats").innerHTML = `${this.multi.players.map((player) => `<div class="multi-result-row"><span>${player.name}</span><strong>${player.score}</strong><small>TRACE ${player.trace} / BLUFFS ${player.bluffs}</small></div>`).join("")}<div class="multi-result-row"><span>SHARED MEMORY</span><strong>ROOM ${pad(this.multiSave.unlockedRoom + 1)}</strong><small>MULTIPLAYER SLOT ${this.multiSlot} / PROGRESSION SAVED</small></div>`;
     this.show("multi-result");
   }
 
