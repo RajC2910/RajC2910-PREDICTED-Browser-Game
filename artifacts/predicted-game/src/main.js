@@ -948,13 +948,44 @@ class PredictedGame {
     else player.bluffStreak = 0;
     if (highest) player.highestChoices += 1;
     if (base < highestReward) player.lowerChoices += 1;
-    player.score += base + bonus;
+    const totalPoints = base + bonus;
+    player.score += totalPoints;
     player.trace = clamp(player.trace + traceDelta, 0, 100);
     player.actions.push(action);
     player.model.observe(action);
     if (predicted) player.predictionHits += 1;
+
+    if (this.multi.challenge) {
+      const challenge = this.multi.challenge;
+      const data = this.multi.challengeData;
+      if (challenge.id === "no-bluff-streak") {
+        data.bluffStreak[index] = confident && !predicted ? data.bluffStreak[index] + 1 : 0;
+        if (data.bluffStreak[index] >= 3) this.multi.challengeFailed = true;
+      } else if (challenge.id === "no-greed-streak") {
+        data.greedStreak[index] = highest ? data.greedStreak[index] + 1 : 0;
+        if (data.greedStreak[index] >= 3) this.multi.challengeFailed = true;
+      } else if (challenge.id === "no-repeats") {
+        data.repeatStreak[index] = repeat ? data.repeatStreak[index] + 1 : 0;
+        if (data.repeatStreak[index] >= 3) this.multi.challengeFailed = true;
+      } else if (challenge.id === "follow-me" && predicted && confident) {
+        data.progress = Math.min(challenge.target || 1, data.progress + 1);
+      } else if (challenge.id === "break-model" && !predicted && confident && player.prediction.confidence >= .8) {
+        data.progress = 1;
+      } else if (challenge.id === "bait") {
+        if (!data.baitReady[index] && predicted && player.prediction.confidence >= .75) data.baitReady[index] = true;
+        else if (data.baitReady[index] && !predicted && confident && player.prediction.confidence >= .75) { data.progress = 1; data.baitReady[index] = false; }
+        else if (data.baitReady[index] && predicted) data.baitReady[index] = false;
+      }
+      const progressValue = challenge.id === "no-bluff-streak" ? data.bluffStreak[index] : challenge.id === "no-greed-streak" ? data.greedStreak[index] : challenge.id === "no-repeats" ? data.repeatStreak[index] : data.progress;
+      const progressTarget = ["no-bluff-streak", "no-greed-streak", "no-repeats"].includes(challenge.id) ? 3 : (challenge.target || 1);
+      const box = document.getElementById("multi-challenge-box");
+      if (box) box.querySelector(".multi-challenge-progress").textContent = progressValue + " / " + progressTarget;
+    }
+
+    player.lastResult = predicted ? "FOLLOWED / +" + totalPoints + " / TRACE +" + Math.max(0, traceDelta) : confident ? "BLUFFED / +" + totalPoints + " / TRACE " + traceDelta : "HESITATED / +" + totalPoints;
     this.moveMultiPlayer(index, action);
     if (player.trace >= 100) { this.failMulti("trace", player.name); return; }
+    if (this.multi.challengeFailed) { this.failMulti("challenge", player.name); return; }
     this.audio.direction();
     this.renderMulti();
     if (this.multi.players.every((item) => item.locked)) {
