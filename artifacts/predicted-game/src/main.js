@@ -886,7 +886,7 @@ class PredictedGame {
   }
 
   createMultiPlayer(name, keySet) {
-    return { name, keySet, color: name === "PLAYER 1" ? "one" : "two", model: new PredictionModel(), score: 0, trace: 0, actions: [], predictionHits: 0, bluffs: 0, bluffStreak: 0, highestChoices: 0, lowerChoices: 0, rewards: {}, prediction: null, locked: false };
+    return { name, keySet, color: name === "PLAYER 1" ? "one" : "two", model: new PredictionModel(), score: 0, trace: 0, actions: [], predictionHits: 0, bluffs: 0, bluffStreak: 0, highestChoices: 0, lowerChoices: 0, rewards: {}, prediction: null, locked: false, lastResult: "WAITING" };
   }
 
   startMulti(index = 0, newMatch = false) {
@@ -901,7 +901,7 @@ class PredictedGame {
       this.multiSave.totalMatches = (this.multiSave.totalMatches || 0) + 1;
       this.writeMultiSlot();
     }
-    this.multi = { players: [this.createMultiPlayer("PLAYER 1", KEYS), this.createMultiPlayer("PLAYER 2", ARROW_KEYS)] };
+    this.multi = { players: [this.createMultiPlayer("PLAYER 1", KEYS), this.createMultiPlayer("PLAYER 2", ARROW_KEYS)], challenge: this.levelIndex >= 3 ? CHALLENGES[(this.levelIndex - 3) % CHALLENGES.length] : null, challengeData: { progress: 0, bluffStreak: [0, 0], greedStreak: [0, 0], repeatStreak: [0, 0], baitReady: [false, false] }, challengeFailed: false };
     this.show("multiplayer");
     $("#multi-level").textContent = pad(this.level.level);
     $("#multi-target").textContent = this.level.target;
