@@ -995,7 +995,7 @@ class PredictedGame {
   }
 
   renderMulti() {
-    $("#multi-grid").innerHTML = this.multi.players.map((player, index) => `<article class="multi-player ${player.color}"><div class="multi-player-head"><div><div class="eyebrow">${player.name} / ${index === 0 ? "A S D" : "ARROWS"}</div><div class="multi-player-score">${player.score} <span>/ ${this.level.target}</span></div></div><div class="multi-trace"><span>TRACE</span><b>${player.trace}</b></div></div><div class="multi-prediction">THE AI THINKS <strong>${player.prediction?.action || "CALIBRATING"}</strong><span>${player.prediction ? `${Math.round(player.prediction.confidence * 100)}%` : ""}</span></div><div class="multi-choices">${ACTIONS.map((action, actionIndex) => `<button class="multi-choice ${action === player.prediction?.action ? "is-predicted" : ""}" data-player="${index}" data-action="${action}" ${player.locked ? "disabled" : ""}><small>${player.keySet[actionIndex]}</small><b>${action}</b><strong>+${player.rewards[action] || 0}</strong></button>`).join("")}</div><div class="multi-foot"><span>BLUFF STREAK ${player.bluffStreak}</span><span>${player.actions.slice(-5).join(" / ") || "NO MOVES"}</span></div></article>`).join("");
+    $("#multi-grid").innerHTML = this.multi.players.map((player, index) => `<article class="multi-player ${player.color}"><div class="multi-player-head"><div><div class="eyebrow">${player.name} / ${index === 0 ? "A S D" : "ARROWS"}</div><div class="multi-player-score">${player.score} <span>/ ${this.level.target}</span></div></div><div class="multi-trace"><span>TRACE</span><b>${player.trace}</b></div></div><div class="multi-prediction">THE AI THINKS <strong>${player.prediction?.action || "CALIBRATING"}</strong><span>${player.prediction ? `${Math.round(player.prediction.confidence * 100)}%` : ""}</span></div><div class="multi-choices">${ACTIONS.map((action, actionIndex) => `<button class="multi-choice ${action === player.prediction?.action ? "is-predicted" : ""}" data-player="${index}" data-action="${action}" ${player.locked ? "disabled" : ""}><small>${player.keySet[actionIndex]}</small><b>${action}</b><strong>+${player.rewards[action] || 0}</strong></button>`).join("")}</div><div class="multi-foot"><span>BLUFF STREAK ${player.bluffStreak}</span><span>${player.actions.slice(-5).join(" / ") || "NO MOVES"}</span></div><div class="multi-last">${player.lastResult}</div></article>`).join("");
   }
 
   moveMultiPlayer(index, action) {
@@ -1010,6 +1010,12 @@ class PredictedGame {
   completeMulti() {
     if (this.state !== "multiplayer") return;
     this.stopClock();
+    if (this.multi.challenge && ["follow-me", "break-model", "bait"].includes(this.multi.challenge.id) && this.multi.challengeData.progress < (this.multi.challenge.target || 1)) {
+      this.failMulti("challenge");
+      return;
+    }
+    const challengeBonus = this.multi.challenge?.bonus || 0;
+    if (challengeBonus) this.multi.players.forEach((player) => { player.score += Math.floor(challengeBonus / 2); });
     this.audio.door();
     const combinedScore = this.multi.players.reduce((sum, player) => sum + player.score, 0);
     this.multiSave.unlockedRoom = Math.max(this.multiSave.unlockedRoom || 0, Math.min(LEVELS.length - 1, this.levelIndex + 1));
@@ -1024,7 +1030,7 @@ class PredictedGame {
     this.stopClock();
     this.audio.failure();
     $("#multi-fail-room").textContent = pad(this.level.level);
-    $("#multi-fail-detail").textContent = reason === "timeout" ? `SHARED CLOCK EXPIRED. TARGET ${this.level.target} / ${this.multi.players.map((player) => `${player.name} ${player.score}`).join(" / ")}.` : `${playerName || "A PLAYER"} REACHED TRACE 100. THE MATCH RESTARTS IN ROOM ${pad(this.level.level)}.`;
+    $("#multi-fail-detail").textContent = reason === "timeout" ? `SHARED CLOCK EXPIRED. TARGET ${this.level.target} / ${this.multi.players.map((player) => `${player.name} ${player.score}`).join(" / ")}.` : reason === "challenge" ? `${this.multi.challenge?.name || "TEAM CHALLENGE"} FAILED. PROGRESSION IS SAFE; ROOM ${pad(this.level.level)} RESTARTS.` : `${playerName || "A PLAYER"} REACHED TRACE 100. THE MATCH RESTARTS IN ROOM ${pad(this.level.level)}.`;
     this.show("multi-fail");
   }
 }
