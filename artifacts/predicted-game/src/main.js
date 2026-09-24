@@ -907,6 +907,9 @@ class PredictedGame {
     $("#multi-target").textContent = this.level.target;
     $("#multi-timer").textContent = "01:00";
     $("#multi-timer-fill").style.transform = "scaleX(1)";
+    const challengeBox = document.getElementById("multi-challenge-box") || (() => { const box = document.createElement("div"); box.id = "multi-challenge-box"; box.className = "multi-challenge"; $("#multi-corridor").insertAdjacentElement("afterend", box); return box; })();
+    challengeBox.innerHTML = this.multi.challenge ? '<div><div class="eyebrow">TEAM CHALLENGE</div><div class="multi-challenge-name">' + this.multi.challenge.name + '</div><div class="multi-challenge-copy">' + this.multi.challenge.rule + '</div></div><div class="multi-challenge-progress">ACTIVE</div>' : '<div><div class="eyebrow">SYSTEM LEARNING</div><div class="multi-challenge-copy">Explicit challenges begin after Room 3.</div></div><div class="multi-challenge-progress">NOT ACTIVE</div>';
+    challengeBox.classList.toggle("is-active", !!this.multi.challenge);
     this.renderMulti();
     this.multi.players.forEach((_, playerIndex) => this.nextMultiTurn(playerIndex));
     this.renderMulti();
