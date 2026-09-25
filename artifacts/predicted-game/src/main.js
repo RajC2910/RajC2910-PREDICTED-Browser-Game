@@ -702,7 +702,10 @@ class PredictedGame {
 
   renderSingleTurn() {
     $("#turn-readout").textContent = `TURN ${pad(this.single.turn)}`;
-    $("#model-message").textContent = `YOU'LL GO ${this.single.prediction.action}`;
+    $('#model-label').textContent = this.single.prediction.secondOrder ? 'SECOND-ORDER READ' : 'THE AI THINKS';
+    $('#model-message').textContent = this.single.prediction.secondOrder ? 'YOU\'LL REACT WITH ' + this.single.prediction.action : 'YOU\'LL GO ' + this.single.prediction.action;
+    $('#read-depth').textContent = this.single.prediction.secondOrder ? '2ND / COUNTERREAD' : '1ST ORDER';
+    $('#corridor').classList.toggle('is-second-order', !!this.single.prediction.secondOrder);
     $("#confidence").textContent = `${Math.round(this.single.prediction.confidence * 100)}%`;
     $("#confidence").classList.toggle("is-low", this.single.prediction.confidence < .65);
     $$(".choice").forEach((button) => {
@@ -724,6 +727,19 @@ class PredictedGame {
     $$(".choice").forEach((item) => { item.disabled = true; });
     button.classList.add("is-picked");
     this.audio.direction();
+    const decisionMs = Math.max(0, Math.round(performance.now() - this.single.turnStartedAt));
+    this.single.decisionTimes.push(decisionMs);
+    const displayedAction = this.single.prediction.action;
+    const baseAction = this.single.basePrediction?.action || displayedAction;
+    const reactedAgainstDisplay = action !== displayedAction;
+    const decisionDelay = clamp((decisionMs - 650) / 3200, 0, 1);
+    const reactionScore = reactedAgainstDisplay ? (this.single.prediction.confidence >= 0.65 ? 0.9 : 0.45) : (this.single.prediction.confidence >= 0.65 ? 0.12 : 0.3);
+    this.single.awareness = clamp(Math.round(this.single.awareness * 0.82 + (reactionScore + decisionDelay * 0.12) * 100 * 0.18), 0, 100);
+    if (action === displayedAction && this.single.prediction.confidence >= 0.65) this.single.trust = clamp(this.single.trust + 5, 0, 100);
+    else if (action !== displayedAction && this.single.prediction.confidence >= 0.65) this.single.trust = clamp(this.single.trust - 7, 0, 100);
+    else this.single.trust = clamp(this.single.trust + (action === displayedAction ? 1 : -1), 0, 100);
+    this.single.reactionHistory.push({ prediction: baseAction, displayedAction, action, confidence: this.single.prediction.confidence, secondOrder: !!this.single.prediction.secondOrder, decisionMs });
+    this.single.reactionHistory = this.single.reactionHistory.slice(-24);
     const predicted = action === this.single.prediction.action;
     const confident = this.single.prediction.confidence >= .65;
     const highestReward = Math.max(...Object.values(this.single.rewards));
@@ -821,6 +837,14 @@ class PredictedGame {
     $("#challenge-name").textContent = challenge.name;
     $("#challenge-copy").textContent = challenge.rule;
     $("#challenge-progress").textContent = challenge.id === "no-bluff-streak" ? `${this.single.challengeData.repeatStreak} / 3 BLUFFS IN A ROW` : challenge.id === "no-greed-streak" ? `${this.single.challengeData.highestStreak} / 3 HIGHEST REWARDS IN A ROW` : challenge.id === "no-repeats" ? `${this.single.challengeData.repeatStreak} / 3 SAME DIRECTIONS IN A ROW` : `${this.single.challengeProgress} / ${challenge.target || 1} COMPLETE`;
+  }
+
+  renderPsychology() {
+    $('#trust-value').textContent = Math.round(this.single.trust) + '%';
+    $('#trust-fill').style.transform = 'scaleX(' + (this.single.trust / 100) + ')';
+    $('#awareness-value').textContent = Math.round(this.single.awareness) + '%';
+    $('#awareness-fill').style.transform = 'scaleX(' + (this.single.awareness / 100) + ')';
+    $('#psych-note').textContent = this.single.secondOrderReads > 0 ? 'The model is learning how you respond to being predicted.' : this.single.trust >= 65 ? 'You are giving confident predictions more weight.' : this.single.trust <= 35 ? 'You are treating confident predictions as bait.' : 'The model is learning how you react when it speaks first.';
   }
 
   renderSingleHud() {
