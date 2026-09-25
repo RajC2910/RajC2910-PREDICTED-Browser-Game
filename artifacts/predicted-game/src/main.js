@@ -672,11 +672,24 @@ class PredictedGame {
 
   generateRewards() {
     const confidence = this.single.prediction.confidence;
-    const variation = Math.round(Math.random() * (this.level.rewardMax - this.level.rewardMin));
-    const predictedReward = this.level.rewardMin + Math.round(variation * .42 + confidence * (this.level.rewardMax - this.level.rewardMin) * .58);
-    const spread = this.level.gap + Math.round(confidence * 25);
-    const first = clamp(predictedReward - Math.round(spread * .44) + Math.round((Math.random() - .5) * 8), 14, predictedReward - 1);
-    const second = clamp(predictedReward - Math.round(spread * .9) + Math.round((Math.random() - .5) * 8), 10, first - 1);
+    let predictedReward;
+    let first;
+    let second;
+
+    if (this.level.level === 10 || this.level.level === 20) {
+      // Final rooms: keep the reward ladder high enough to make 3,000 points reachable.
+      // Highest: roughly 125–148, second: 100–113, third: 86–92.
+      predictedReward = 125 + Math.round(Math.random() * 10 + confidence * 15);
+      first = 100 + Math.round(Math.random() * 8 + confidence * 7);
+      second = 85 + Math.round(Math.random() * 6 + (1 - confidence) * 4);
+    } else {
+      const variation = Math.round(Math.random() * (this.level.rewardMax - this.level.rewardMin));
+      predictedReward = this.level.rewardMin + Math.round(variation * .42 + confidence * (this.level.rewardMax - this.level.rewardMin) * .58);
+      const spread = this.level.gap + Math.round(confidence * 25);
+      first = clamp(predictedReward - Math.round(spread * .44) + Math.round((Math.random() - .5) * 8), 14, predictedReward - 1);
+      second = clamp(predictedReward - Math.round(spread * .9) + Math.round((Math.random() - .5) * 8), 10, first - 1);
+    }
+
     const alternatives = [first, second].sort(() => Math.random() - .5);
     this.single.rewards = { [this.single.prediction.action]: predictedReward };
     otherActions(this.single.prediction.action).forEach((action, index) => { this.single.rewards[action] = alternatives[index]; });
@@ -1007,9 +1020,22 @@ class PredictedGame {
     const player = this.multi.players[index];
     const behavior = this.behaviorFor(player);
     player.prediction = player.model.predict(this.level.level, behavior);
-    const highest = this.level.rewardMin + Math.round(Math.random() * (this.level.rewardMax - this.level.rewardMin) * .35 + player.prediction.confidence * (this.level.rewardMax - this.level.rewardMin) * .65);
-    const spread = this.level.gap + Math.round(player.prediction.confidence * 22);
-    const alternatives = [Math.max(14, highest - Math.round(spread * .45)), Math.max(10, highest - spread)].sort(() => Math.random() - .5);
+
+    let highest;
+    let first;
+    let second;
+    if (this.level.level === 10 || this.level.level === 20) {
+      highest = 125 + Math.round(Math.random() * 10 + player.prediction.confidence * 15);
+      first = 100 + Math.round(Math.random() * 8 + player.prediction.confidence * 7);
+      second = 85 + Math.round(Math.random() * 6 + (1 - player.prediction.confidence) * 4);
+    } else {
+      highest = this.level.rewardMin + Math.round(Math.random() * (this.level.rewardMax - this.level.rewardMin) * .35 + player.prediction.confidence * (this.level.rewardMax - this.level.rewardMin) * .65);
+      const spread = this.level.gap + Math.round(player.prediction.confidence * 22);
+      first = Math.max(14, highest - Math.round(spread * .45));
+      second = Math.max(10, highest - spread);
+    }
+
+    const alternatives = [first, second].sort(() => Math.random() - .5);
     player.rewards = { [player.prediction.action]: highest };
     otherActions(player.prediction.action).forEach((action, actionIndex) => { player.rewards[action] = alternatives[actionIndex]; });
     player.locked = false;
@@ -1036,7 +1062,7 @@ class PredictedGame {
     if (bluff) { player.bluffStreak += 1; player.bluffs += 1; bonus = Math.min(20, [10, 12, 15][player.bluffStreak - 1] || 20); traceDelta = Math.min(-1, traceDelta - 3); }
     else player.bluffStreak = 0;
     if (highest) player.highestChoices += 1;
-    if (base < highestReward) player.lowerChoices += 1;
+    if (!highest) player.lowerChoices += 1;
     const totalPoints = base + bonus;
     player.score += totalPoints;
     player.trace = clamp(player.trace + traceDelta, 0, 100);
