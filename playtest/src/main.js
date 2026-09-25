@@ -5,6 +5,7 @@ const RUN_SECONDS = 60;
 const PROFILE_KEY = "predicted:preferences";
 const SLOT_PREFIX = "predicted:save-slot:";
 const MULTI_SLOT_PREFIX = "predicted:multi-save-slot:";
+const BLIND_READ_START_INDEX = 10;
 const INTRO_NARRATIVE = `We built the world to make humanity safer.
 
 Then we learned how humans behave.
@@ -31,14 +32,24 @@ const LEVELS = [
   { level: 8, name: "COUNTERREAD", target: 2000, rewardMin: 70, rewardMax: 116, gap: 25 },
   { level: 9, name: "THE GLASS ROOM", target: 2500, rewardMin: 74, rewardMax: 124, gap: 28 },
   { level: 10, name: "THE EXIT", target: 3000, rewardMin: 78, rewardMax: 132, gap: 31 },
+  { level: 11, name: "OBSERVER", target: 500, rewardMin: 46, rewardMax: 72, gap: 8 },
+  { level: 12, name: "READER", target: 600, rewardMin: 50, rewardMax: 76, gap: 10 },
+  { level: 13, name: "PROFILER", target: 700, rewardMin: 54, rewardMax: 82, gap: 12 },
+  { level: 14, name: "ADVERSARY", target: 800, rewardMin: 58, rewardMax: 88, gap: 15 },
+  { level: 15, name: "MIRROR", target: 900, rewardMin: 60, rewardMax: 94, gap: 17 },
+  { level: 16, name: "PRESSURE", target: 1000, rewardMin: 62, rewardMax: 100, gap: 19 },
+  { level: 17, name: "CONSTRAINT", target: 1500, rewardMin: 66, rewardMax: 108, gap: 22 },
+  { level: 18, name: "COUNTERREAD", target: 2000, rewardMin: 70, rewardMax: 116, gap: 25 },
+  { level: 19, name: "THE GLASS ROOM", target: 2500, rewardMin: 74, rewardMax: 124, gap: 28 },
+  { level: 20, name: "THE EXIT", target: 3000, rewardMin: 78, rewardMax: 132, gap: 31 },
 ];
 
 const CHALLENGES = [
-  { id: "no-bluff-streak", name: "DON'T GET COMFORTABLE", rule: "Do not BLUFF three times consecutively.", bonus: 45 },
-  { id: "no-greed-streak", name: "GREED LEAVES A TRACE", rule: "Do not select the highest reward three times consecutively.", bonus: 50 },
+  { id: "no-bluff-streak", name: "DON'T GET COMFORTABLE", rule: "Do not BLUFF two times consecutively.", bonus: 45 },
+  { id: "no-greed-streak", name: "GREED LEAVES A TRACE", rule: "Do not select the highest reward two times consecutively.", bonus: 50 },
   { id: "follow-me", name: "FOLLOW ME", rule: "Follow two high-confidence predictions.", bonus: 45, target: 2 },
   { id: "break-model", name: "BREAK THE MODEL", rule: "Successfully bluff a prediction at 80% confidence or higher.", bonus: 50, target: 1 },
-  { id: "no-repeats", name: "NO REPEATS", rule: "Do not select the same direction three times consecutively.", bonus: 40 },
+  { id: "no-repeats", name: "NO REPEATS", rule: "Do not select the same direction two times consecutively.", bonus: 40 },
   { id: "bait", name: "BAIT", rule: "Follow one 75% prediction, then bluff the next 75% prediction.", bonus: 70, target: 1 },
 ];
 
@@ -132,7 +143,7 @@ document.querySelector("#root").innerHTML = `
         <div class="room-layout">
           <div class="room-main">
             <div class="room-intro"><div><div class="room-label">CURRENT ROOM / <span id="room-level-name">OBSERVER</span></div><h2 class="room-name" id="room-title">OBSERVER</h2></div><div class="room-goal">REACH ESCAPE SCORE<br><strong id="goal-copy">500</strong></div></div>
-            <div class='model-strip'><div class='model-id'><div class='model-mark'>P</div><div><div class='model-label' id='model-label'>THE AI THINKS</div><div class='model-says' id='model-message'>YOU'LL GO LEFT</div></div></div><div class='model-read'><div class='model-label'>READ DEPTH</div><div class='confidence' id='read-depth'>1ST ORDER</div><div class='model-label model-confidence-label'>CONFIDENCE</div><div class='confidence' id='confidence'>CALIBRATING</div></div></div>
+            <div class='model-strip'><div class='model-id'><div class='model-mark'>P</div><div><div class='model-label' id='model-label'>THE AI THINKS</div><div class='model-says' id='model-message'>YOU'LL GO LEFT</div></div></div><div class='model-read'><div class='model-label' id='read-depth-label'>READ DEPTH</div><div class='confidence' id='read-depth'>1ST ORDER</div><div class='model-label model-confidence-label'>CONFIDENCE</div><div class='confidence' id='confidence'>CALIBRATING</div></div></div>
             <div class="corridor" id="corridor"><div class="corridor-depth"></div><div class="lane-markers"><div class="lane-marker" data-lane="LEFT"></div><div class="lane-marker" data-lane="CENTER"></div><div class="lane-marker" data-lane="RIGHT"></div></div><div class="exit-gate" id="exit-gate"><div class="exit-label">EXIT / LOCKED</div></div><div class="player-dot" id="player-dot"></div><div class="corridor-status" id="corridor-status">POSITION / CENTER</div></div>
             <div class="choice-intro">The predicted lane pays most. The room is watching what you do with that information.</div>
             <div class="choices" role="group" aria-label="Lane choices">${ACTIONS.map((action, index) => `<button class="choice" data-action="${action}"><span class="choice-key">${KEYS[index]}</span><span class="choice-title">${action}</span><span class="choice-reward" data-reward-for="${action}">+00</span><span class="choice-note">VISIBLE REWARD</span></button>`).join("")}</div>
@@ -408,7 +419,7 @@ class PredictedGame {
 
   readSlot(slot) {
     try {
-      const stored = JSON.parse(localStorage.getItem(`\${SLOT_PREFIX}\${slot}`));
+      const stored = JSON.parse(localStorage.getItem(`${SLOT_PREFIX}${slot}`));
       return stored ? { ...this.defaultSave(slot), ...stored, personality: { ...this.defaultSave(slot).personality, ...(stored.personality || {}) } } : null;
     } catch { return null; }
   }
@@ -425,7 +436,7 @@ class PredictedGame {
 
   readMultiSlot(slot) {
     try {
-      const stored = JSON.parse(localStorage.getItem(`\${MULTI_SLOT_PREFIX}\${slot}`));
+      const stored = JSON.parse(localStorage.getItem(`${MULTI_SLOT_PREFIX}${slot}`));
       return stored ? { ...this.defaultMultiSave(slot), ...stored } : null;
     } catch { return null; }
   }
@@ -433,15 +444,15 @@ class PredictedGame {
   writeMultiSlot() {
     if (!this.multiSlot || !this.multiSave) return;
     this.multiSave.lastPlayed = new Date().toISOString().slice(0, 10);
-    try { localStorage.setItem(`\${MULTI_SLOT_PREFIX}\${this.multiSlot}`, JSON.stringify(this.multiSave)); } catch {}
+    try { localStorage.setItem(`${MULTI_SLOT_PREFIX}${this.multiSlot}`, JSON.stringify(this.multiSave)); } catch {}
   }
 
   multiSlotCard(slot) {
     const save = this.readMultiSlot(slot);
     if (!save) {
-      return `<article class="slot-card is-empty multi-slot-card"><div class="slot-number">0\${slot}</div><div><div class="slot-title">MULTIPLAYER SLOT \${slot}</div><div class="slot-copy">EMPTY LOCAL MEMORY / START AT ROOM 01</div></div><button class="secondary-button" data-multi-slot-action="new" data-slot="\${slot}">NEW MATCH</button></article>`;
+      return `<article class="slot-card is-empty multi-slot-card"><div class="slot-number">0${slot}</div><div><div class="slot-title">MULTIPLAYER SLOT ${slot}</div><div class="slot-copy">EMPTY LOCAL MEMORY / START AT ROOM 01</div></div><button class="secondary-button" data-multi-slot-action="new" data-slot="${slot}">NEW MATCH</button></article>`;
     }
-    return `<article class="slot-card multi-slot-card"><div class="slot-number">0\${slot}</div><div class="slot-details"><div class="slot-title">MULTIPLAYER SLOT \${slot}</div><div class="slot-copy">ROOM \${pad(save.unlockedRoom + 1)} / BEST \${save.bestCombinedScore}</div><div class="slot-copy">\${save.totalMatches} MATCHES / \${save.lastPlayed}</div></div><div class="slot-actions"><button class="secondary-button" data-multi-slot-action="load" data-slot="\${slot}">LOAD</button><button class="text-button" data-multi-slot-action="new" data-slot="\${slot}">RESET</button></div></article>`;
+    return `<article class="slot-card multi-slot-card"><div class="slot-number">0${slot}</div><div class="slot-details"><div class="slot-title">MULTIPLAYER SLOT ${slot}</div><div class="slot-copy">ROOM ${pad(save.unlockedRoom + 1)} / BEST ${save.bestCombinedScore}</div><div class="slot-copy">${save.totalMatches} MATCHES / ${save.lastPlayed}</div></div><div class="slot-actions"><button class="secondary-button" data-multi-slot-action="load" data-slot="${slot}">LOAD</button><button class="text-button" data-multi-slot-action="new" data-slot="${slot}">RESET</button></div></article>`;
   }
 
   renderMultiSlots() {
@@ -551,12 +562,18 @@ class PredictedGame {
     return this.archetypeFromStats(stats);
   }
 
+  challengeForIndex(index) {
+    const phaseIndex = index % 10;
+    if (phaseIndex < 3) return null;
+    return CHALLENGES[(phaseIndex - 3) % CHALLENGES.length];
+  }
+
   challengeFor() {
-    if (this.levelIndex < 3) return null;
-    const saveProfile = this.save?.personality || {};
-    if (saveProfile.greed >= 70) return CHALLENGES.find((challenge) => challenge.id === "no-greed-streak");
-    if (saveProfile.repetition >= 45) return CHALLENGES.find((challenge) => challenge.id === "no-repeats");
-    return CHALLENGES[(this.levelIndex - 3) % CHALLENGES.length];
+    return this.challengeForIndex(this.levelIndex);
+  }
+
+  isBlindRead() {
+    return this.levelIndex >= BLIND_READ_START_INDEX;
   }
 
   startSingle(index, newRun = false) {
@@ -679,6 +696,7 @@ class PredictedGame {
 
   renderSingleRoom() {
     $("#game-slot").textContent = `SLOT ${this.currentSlot} / SINGLE PLAYER`;
+    $(".room-screen").classList.toggle("blind-read", this.isBlindRead());
     $("#level-readout").textContent = pad(this.level.level);
     $("#room-level-name").textContent = this.level.name;
     $("#room-title").textContent = this.level.name;
@@ -701,10 +719,11 @@ class PredictedGame {
   }
 
   renderSingleTurn() {
+    const blindRead = this.isBlindRead();
     $("#turn-readout").textContent = `TURN ${pad(this.single.turn)}`;
-    $('#model-label').textContent = this.single.prediction.secondOrder ? 'SECOND-ORDER READ' : 'THE AI THINKS';
-    $('#model-message').textContent = this.single.prediction.secondOrder ? 'YOU\'LL REACT WITH ' + this.single.prediction.action : 'YOU\'LL GO ' + this.single.prediction.action;
-    $('#read-depth').textContent = this.single.prediction.secondOrder ? '2ND / COUNTERREAD' : '1ST ORDER';
+    $('#model-label').textContent = blindRead ? 'PREDICTION MASKED' : (this.single.prediction.secondOrder ? 'SECOND-ORDER READ' : 'THE AI THINKS');
+    $('#model-message').textContent = blindRead ? 'THE OPTION IS WITHHELD' : (this.single.prediction.secondOrder ? 'YOU\'LL REACT WITH ' + this.single.prediction.action : 'YOU\'LL GO ' + this.single.prediction.action);
+    $('#read-depth').textContent = blindRead ? '' : (this.single.prediction.secondOrder ? '2ND / COUNTERREAD' : '1ST ORDER');
     $('#corridor').classList.toggle('is-second-order', !!this.single.prediction.secondOrder);
     $("#confidence").textContent = `${Math.round(this.single.prediction.confidence * 100)}%`;
     $("#confidence").classList.toggle("is-low", this.single.prediction.confidence < .65);
@@ -713,7 +732,7 @@ class PredictedGame {
       button.disabled = false;
       button.classList.remove("is-picked", "is-predicted");
       button.querySelector(".choice-reward").textContent = `+${this.single.rewards[action]}`;
-      if (action === this.single.prediction.action) button.classList.add("is-predicted");
+      if (!blindRead && action === this.single.prediction.action) button.classList.add("is-predicted");
     });
     $("#feedback").className = "feedback";
     this.renderHistory();
@@ -742,20 +761,20 @@ class PredictedGame {
     this.single.reactionHistory = this.single.reactionHistory.slice(-24);
     const predicted = action === this.single.prediction.action;
     const confident = this.single.prediction.confidence >= .65;
-    const highestReward = Math.max(...Object.values(this.single.rewards));
+    const rankedRewards = Object.entries(this.single.rewards).sort((a, b) => b[1] - a[1]);
+    const highestAction = rankedRewards[0][0];
+    const secondHighestAction = rankedRewards[1][0];
     const basePoints = this.single.rewards[action];
-    const highest = basePoints === highestReward;
+    const highest = action === highestAction;
+    const bluff = action === secondHighestAction;
     const repeated = this.single.actions.at(-1) === action;
     let traceDelta = predicted ? Math.round(6 + this.single.prediction.confidence * 12) : 0;
     if (repeated) traceDelta += 3;
     if (highest) traceDelta += 2;
     let bluffBonus = 0;
     if (highest) this.single.highestChoices += 1;
-    if (basePoints < highestReward) this.single.lowerChoices += 1;
-    if (predicted) {
-      this.single.currentBluffStreak = 0;
-      this.single.challengeData.follow = confident ? this.single.challengeData.follow + 1 : this.single.challengeData.follow;
-    } else if (confident) {
+    if (!highest) this.single.lowerChoices += 1;
+    if (bluff) {
       this.single.currentBluffStreak += 1;
       this.single.longestBluffStreak = Math.max(this.single.longestBluffStreak, this.single.currentBluffStreak);
       this.single.bluffs += 1;
@@ -765,16 +784,18 @@ class PredictedGame {
     } else {
       this.single.currentBluffStreak = 0;
     }
+
+    if (predicted && confident) this.single.challengeData.follow += 1;
     const totalPoints = basePoints + bluffBonus;
     this.single.score += totalPoints;
     this.single.trace = clamp(this.single.trace + traceDelta, 0, 100);
     this.single.actions.push(action);
     this.single.model.observe(action);
     if (predicted) this.single.predictionHits += 1;
-    this.updateChallenge(action, predicted, confident, highest, repeated);
+    this.updateChallenge(action, predicted, confident, highest, repeated, bluff);
     this.renderSingleHud();
     this.moveSinglePlayer(action);
-    this.showFeedback(predicted ? "I KNEW YOU WOULD." : confident ? "YOU FOOLED ME." : "THE MODEL HESITATED.", predicted ? `+${basePoints} / TRACE +${Math.max(0, traceDelta)}` : confident ? `+${basePoints} / BLUFF +${bluffBonus} / TRACE ${traceDelta}` : `+${basePoints} / THE READ WAS NOT CERTAIN`, totalPoints, predicted);
+    this.showFeedback(predicted ? "I KNEW YOU WOULD." : bluff ? "YOU FOOLED ME." : confident ? "THE MODEL HELD." : "THE MODEL HESITATED.", predicted ? `+${basePoints} / TRACE +${Math.max(0, traceDelta)}` : bluff ? `+${basePoints} / BLUFF +${bluffBonus} / TRACE ${traceDelta}` : `+${basePoints} / THIRD-RANK MOVE / TRACE ${traceDelta}`, totalPoints, predicted);
     if (this.single.challengeFailed) {
       this.turnTimer = setTimeout(() => this.failChallenge(), 650);
       return;
@@ -790,27 +811,27 @@ class PredictedGame {
     this.turnTimer = setTimeout(() => this.nextSingleTurn(), 850);
   }
 
-  updateChallenge(action, predicted, confident, highest, repeated) {
+  updateChallenge(action, predicted, confident, highest, repeated, bluff) {
     const challenge = this.single.challenge;
     if (!challenge) return;
     const data = this.single.challengeData;
     if (challenge.id === "no-bluff-streak") {
-      data.repeatStreak = confident && !predicted ? data.repeatStreak + 1 : 0;
-      if (data.repeatStreak >= 3) this.single.challengeFailed = true;
+      data.repeatStreak = bluff ? data.repeatStreak + 1 : 0;
+      if (data.repeatStreak >= 2) this.single.challengeFailed = true;
     }
     if (challenge.id === "no-greed-streak") {
       data.highestStreak = highest ? data.highestStreak + 1 : 0;
-      if (data.highestStreak >= 3) this.single.challengeFailed = true;
+      if (data.highestStreak >= 2) this.single.challengeFailed = true;
     }
     if (challenge.id === "no-repeats") {
       data.repeatStreak = repeated ? data.repeatStreak + 1 : 0;
-      if (data.repeatStreak >= 3) this.single.challengeFailed = true;
+      if (data.repeatStreak >= 2) this.single.challengeFailed = true;
     }
     if (challenge.id === "follow-me") this.single.challengeProgress = Math.min(2, data.follow);
-    if (challenge.id === "break-model" && !predicted && confident && this.single.prediction.confidence >= .8) this.single.challengeProgress = 1;
+    if (challenge.id === "break-model" && bluff && confident && this.single.prediction.confidence >= .8) this.single.challengeProgress = 1;
     if (challenge.id === "bait") {
       if (!data.baitReady && predicted && this.single.prediction.confidence >= .75) data.baitReady = true;
-      else if (data.baitReady && !predicted && confident && this.single.prediction.confidence >= .75) this.single.challengeProgress = 1;
+      else if (data.baitReady && bluff && confident && this.single.prediction.confidence >= .75) this.single.challengeProgress = 1;
       else if (data.baitReady && predicted) data.baitReady = false;
     }
     if (challenge.id === "no-bluff-streak" || challenge.id === "no-greed-streak" || challenge.id === "no-repeats") this.single.challengeProgress = data.repeatStreak || data.highestStreak || 0;
@@ -836,7 +857,7 @@ class PredictedGame {
     $("#challenge-card").classList.add("is-active");
     $("#challenge-name").textContent = challenge.name;
     $("#challenge-copy").textContent = challenge.rule;
-    $("#challenge-progress").textContent = challenge.id === "no-bluff-streak" ? `${this.single.challengeData.repeatStreak} / 3 BLUFFS IN A ROW` : challenge.id === "no-greed-streak" ? `${this.single.challengeData.highestStreak} / 3 HIGHEST REWARDS IN A ROW` : challenge.id === "no-repeats" ? `${this.single.challengeData.repeatStreak} / 3 SAME DIRECTIONS IN A ROW` : `${this.single.challengeProgress} / ${challenge.target || 1} COMPLETE`;
+    $("#challenge-progress").textContent = challenge.id === "no-bluff-streak" ? `${this.single.challengeData.repeatStreak} / 2 BLUFFS IN A ROW` : challenge.id === "no-greed-streak" ? `${this.single.challengeData.highestStreak} / 2 HIGHEST REWARDS IN A ROW` : challenge.id === "no-repeats" ? `${this.single.challengeData.repeatStreak} / 2 SAME DIRECTIONS IN A ROW` : `${this.single.challengeProgress} / ${challenge.target || 1} COMPLETE`;
   }
 
   renderPsychology() {
@@ -967,7 +988,7 @@ class PredictedGame {
       this.multiSave.totalMatches = (this.multiSave.totalMatches || 0) + 1;
       this.writeMultiSlot();
     }
-    this.multi = { players: [this.createMultiPlayer("PLAYER 1", KEYS), this.createMultiPlayer("PLAYER 2", ARROW_KEYS)], challenge: this.levelIndex >= 3 ? CHALLENGES[(this.levelIndex - 3) % CHALLENGES.length] : null, challengeData: { progress: 0, bluffStreak: [0, 0], greedStreak: [0, 0], repeatStreak: [0, 0], baitReady: [false, false] }, challengeFailed: false };
+    this.multi = { players: [this.createMultiPlayer("PLAYER 1", KEYS), this.createMultiPlayer("PLAYER 2", ARROW_KEYS)], challenge: this.challengeForIndex(this.levelIndex), challengeData: { progress: 0, bluffStreak: [0, 0], greedStreak: [0, 0], repeatStreak: [0, 0], baitReady: [false, false] }, challengeFailed: false };
     this.show("multiplayer");
     $("#multi-level").textContent = pad(this.level.level);
     $("#multi-target").textContent = this.level.target;
@@ -1001,16 +1022,18 @@ class PredictedGame {
     player.locked = true;
     const predicted = action === player.prediction.action;
     const confident = player.prediction.confidence >= .65;
-    const highestReward = Math.max(...Object.values(player.rewards));
+    const rankedRewards = Object.entries(player.rewards).sort((a, b) => b[1] - a[1]);
+    const highestAction = rankedRewards[0][0];
+    const secondHighestAction = rankedRewards[1][0];
     const base = player.rewards[action];
-    const highest = base === highestReward;
+    const highest = action === highestAction;
+    const bluff = action === secondHighestAction;
     const repeat = player.actions.at(-1) === action;
     let traceDelta = predicted ? Math.round(6 + player.prediction.confidence * 12) : 0;
     if (repeat) traceDelta += 3;
     if (highest) traceDelta += 2;
     let bonus = 0;
-    if (predicted) player.bluffStreak = 0;
-    else if (confident) { player.bluffStreak += 1; player.bluffs += 1; bonus = Math.min(20, [10, 12, 15][player.bluffStreak - 1] || 20); traceDelta = Math.min(-1, traceDelta - 3); }
+    if (bluff) { player.bluffStreak += 1; player.bluffs += 1; bonus = Math.min(20, [10, 12, 15][player.bluffStreak - 1] || 20); traceDelta = Math.min(-1, traceDelta - 3); }
     else player.bluffStreak = 0;
     if (highest) player.highestChoices += 1;
     if (base < highestReward) player.lowerChoices += 1;
@@ -1025,30 +1048,30 @@ class PredictedGame {
       const challenge = this.multi.challenge;
       const data = this.multi.challengeData;
       if (challenge.id === "no-bluff-streak") {
-        data.bluffStreak[index] = confident && !predicted ? data.bluffStreak[index] + 1 : 0;
-        if (data.bluffStreak[index] >= 3) this.multi.challengeFailed = true;
+        data.bluffStreak[index] = bluff ? data.bluffStreak[index] + 1 : 0;
+        if (data.bluffStreak[index] >= 2) this.multi.challengeFailed = true;
       } else if (challenge.id === "no-greed-streak") {
         data.greedStreak[index] = highest ? data.greedStreak[index] + 1 : 0;
-        if (data.greedStreak[index] >= 3) this.multi.challengeFailed = true;
+        if (data.greedStreak[index] >= 2) this.multi.challengeFailed = true;
       } else if (challenge.id === "no-repeats") {
         data.repeatStreak[index] = repeat ? data.repeatStreak[index] + 1 : 0;
-        if (data.repeatStreak[index] >= 3) this.multi.challengeFailed = true;
+        if (data.repeatStreak[index] >= 2) this.multi.challengeFailed = true;
       } else if (challenge.id === "follow-me" && predicted && confident) {
         data.progress = Math.min(challenge.target || 1, data.progress + 1);
-      } else if (challenge.id === "break-model" && !predicted && confident && player.prediction.confidence >= .8) {
+      } else if (challenge.id === "break-model" && bluff && confident && player.prediction.confidence >= .8) {
         data.progress = 1;
       } else if (challenge.id === "bait") {
         if (!data.baitReady[index] && predicted && player.prediction.confidence >= .75) data.baitReady[index] = true;
-        else if (data.baitReady[index] && !predicted && confident && player.prediction.confidence >= .75) { data.progress = 1; data.baitReady[index] = false; }
+        else if (data.baitReady[index] && bluff && confident && player.prediction.confidence >= .75) { data.progress = 1; data.baitReady[index] = false; }
         else if (data.baitReady[index] && predicted) data.baitReady[index] = false;
       }
       const progressValue = challenge.id === "no-bluff-streak" ? data.bluffStreak[index] : challenge.id === "no-greed-streak" ? data.greedStreak[index] : challenge.id === "no-repeats" ? data.repeatStreak[index] : data.progress;
-      const progressTarget = ["no-bluff-streak", "no-greed-streak", "no-repeats"].includes(challenge.id) ? 3 : (challenge.target || 1);
+      const progressTarget = ["no-bluff-streak", "no-greed-streak", "no-repeats"].includes(challenge.id) ? 2 : (challenge.target || 1);
       const box = document.getElementById("multi-challenge-box");
       if (box) box.querySelector(".multi-challenge-progress").textContent = progressValue + " / " + progressTarget;
     }
 
-    player.lastResult = predicted ? "FOLLOWED / +" + totalPoints + " / TRACE +" + Math.max(0, traceDelta) : confident ? "BLUFFED / +" + totalPoints + " / TRACE " + traceDelta : "HESITATED / +" + totalPoints;
+    player.lastResult = predicted ? "FOLLOWED / +" + totalPoints + " / TRACE +" + Math.max(0, traceDelta) : bluff ? "BLUFFED / +" + totalPoints + " / TRACE " + traceDelta : "THIRD-RANK MOVE / +" + totalPoints + " / TRACE " + traceDelta;
     this.moveMultiPlayer(index, action);
     if (player.trace >= 100) { this.failMulti("trace", player.name); return; }
     if (this.multi.challengeFailed) { this.failMulti("challenge", player.name); return; }
@@ -1061,7 +1084,8 @@ class PredictedGame {
   }
 
   renderMulti() {
-    $("#multi-grid").innerHTML = this.multi.players.map((player, index) => `<article class="multi-player ${player.color}"><div class="multi-player-head"><div><div class="eyebrow">${player.name} / ${index === 0 ? "A S D" : "ARROWS"}</div><div class="multi-player-score">${player.score} <span>/ ${this.level.target}</span></div></div><div class="multi-trace"><span>TRACE</span><b>${player.trace}</b></div></div><div class="multi-prediction">THE AI THINKS <strong>${player.prediction?.action || "CALIBRATING"}</strong><span>${player.prediction ? `${Math.round(player.prediction.confidence * 100)}%` : ""}</span></div><div class="multi-choices">${ACTIONS.map((action, actionIndex) => `<button class="multi-choice ${action === player.prediction?.action ? "is-predicted" : ""}" data-player="${index}" data-action="${action}" ${player.locked ? "disabled" : ""}><small>${player.keySet[actionIndex]}</small><b>${action}</b><strong>+${player.rewards[action] || 0}</strong></button>`).join("")}</div><div class="multi-foot"><span>BLUFF STREAK ${player.bluffStreak}</span><span>${player.actions.slice(-5).join(" / ") || "NO MOVES"}</span></div><div class="multi-last">${player.lastResult}</div></article>`).join("");
+    const blindRead = this.isBlindRead();
+    $("#multi-grid").innerHTML = this.multi.players.map((player, index) => `<article class="multi-player ${player.color}"><div class="multi-player-head"><div><div class="eyebrow">${player.name} / ${index === 0 ? "A S D" : "ARROWS"}</div><div class="multi-player-score">${player.score} <span>/ ${this.level.target}</span></div></div><div class="multi-trace"><span>TRACE</span><b>${player.trace}</b></div></div><div class="multi-prediction">${blindRead ? "PREDICTION MASKED" : "THE AI THINKS"} <strong>${blindRead ? "OPTION WITHHELD" : (player.prediction?.action || "CALIBRATING")}</strong><span>${player.prediction ? `${Math.round(player.prediction.confidence * 100)}%` : ""}</span></div><div class="multi-choices">${ACTIONS.map((action, actionIndex) => `<button class="multi-choice ${!blindRead && action === player.prediction?.action ? "is-predicted" : ""}" data-player="${index}" data-action="${action}" ${player.locked ? "disabled" : ""}><small>${player.keySet[actionIndex]}</small><b>${action}</b><strong>+${player.rewards[action] || 0}</strong></button>`).join("")}</div><div class="multi-foot"><span>BLUFF STREAK ${player.bluffStreak}</span><span>${player.actions.slice(-5).join(" / ") || "NO MOVES"}</span></div><div class="multi-last">${player.lastResult}</div></article>`).join("");
   }
 
   moveMultiPlayer(index, action) {
