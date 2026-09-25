@@ -847,6 +847,15 @@ class PredictedGame {
     $('#psych-note').textContent = this.single.secondOrderReads > 0 ? 'The model is learning how you respond to being predicted.' : this.single.trust >= 65 ? 'You are giving confident predictions more weight.' : this.single.trust <= 35 ? 'You are treating confident predictions as bait.' : 'The model is learning how you react when it speaks first.';
   }
 
+  modelTheoryFor() {
+    if (this.single.secondOrderReads >= 2 && this.single.awareness >= 60) return 'YOU STOPPED PLAYING THE ROOM. YOU STARTED PLAYING THE PREDICTION.';
+    if (this.single.trust >= 68) return 'YOU TRUST A CONFIDENT READ WHEN IT PAYS.';
+    if (this.single.trust <= 32) return 'YOU ASSUME THE MODEL IS BAITING YOU.';
+    if (this.single.awareness >= 55) return 'YOU CHANGE BEHAVIOUR WHEN YOU FEEL OBSERVED.';
+    const average = this.single.decisionTimes.length ? Math.round(this.single.decisionTimes.reduce((sum, value) => sum + value, 0) / this.single.decisionTimes.length) : 0;
+    return average > 1800 ? 'YOU TAKE LONGER WHEN THE MODEL SOUNDS CERTAIN.' : 'YOU OPTIMIZE BEFORE YOU QUESTION THE MODEL.';
+  }
+
   renderSingleHud() {
     $("#score").textContent = this.single.score;
     $("#trace-value").textContent = `${this.single.trace} / 100`;
@@ -854,6 +863,7 @@ class PredictedGame {
     $("#trace-fill").classList.toggle("is-danger", this.single.trace >= 70);
     $("#bluff-streak").textContent = this.single.currentBluffStreak;
     this.renderChallenge();
+    this.renderPsychology();
   }
 
   renderHistory() {
@@ -926,6 +936,7 @@ class PredictedGame {
   }
 
   renderComplete() {
+    this.single.modelTheory = this.modelTheoryFor();
     const stats = this.personalityStats();
     const accuracy = this.single.actions.length ? Math.round((this.single.predictionHits / this.single.actions.length) * 100) : 0;
     $("#complete-score").textContent = this.single.score;
@@ -936,7 +947,7 @@ class PredictedGame {
     $("#complete-turns").textContent = this.single.actions.length;
     $("#complete-lead").textContent = this.levelIndex >= LEVELS.length - 1 ? "The final room opened. The system has no further corridor to offer." : `Room ${pad(this.level.level)} is clear. Room ${pad(this.level.level + 1)} is now unlocked.`;
     $("#next-room-button").textContent = this.levelIndex >= LEVELS.length - 1 ? "RETURN TO MENU" : `ENTER ROOM ${pad(this.level.level + 1)}`;
-    $("#profile-metrics").innerHTML = `<div class="stat-label">BEHAVIOUR READ</div><div class="profile-grid"><span>GREED <b>${Math.round(stats.greed * 100)}%</b></span><span>REPETITION <b>${Math.round(stats.repetition * 100)}%</b></span><span>RISK <b>${Math.round(stats.risk * 100)}%</b></span><span>BLUFF <b>${this.single.bluffs}</b></span><span>SEQUENCE <b>${stats.sequence}</b></span></div>`;
+    $("#profile-metrics").innerHTML = `<div class="stat-label">BEHAVIOUR READ</div><div class="profile-grid"><span>GREED <b>${Math.round(stats.greed * 100)}%</b></span><span>REPETITION <b>${Math.round(stats.repetition * 100)}%</b></span><span>RISK <b>${Math.round(stats.risk * 100)}%</b></span><span>BLUFF <b>${this.single.bluffs}</b></span><span>AWARENESS <b>${Math.round(this.single.awareness)}%</b></span><span>TRUST <b>${Math.round(this.single.trust)}%</b></span><span>2ND-ORDER <b>${this.single.secondOrderReads}</b></span><span>AVG DECISION <b>${this.single.decisionTimes.length ? Math.round(this.single.decisionTimes.reduce((sum, value) => sum + value, 0) / this.single.decisionTimes.length) : 0}MS</b></span><span>SEQUENCE <b>${stats.sequence}</b></span></div><div class="model-theory"><div class="stat-label">MODEL THEORY</div><div class="stat-value">${this.single.modelTheory}</div></div>`;
     $("#complete-challenge").innerHTML = this.single.challenge ? `<div class="stat-label">CHALLENGE</div><div class="stat-value">+${this.single.challenge.bonus} BONUS / ${this.single.challenge.name}</div>` : "";
   }
 
