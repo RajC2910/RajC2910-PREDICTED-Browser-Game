@@ -100,6 +100,20 @@ main.app:has(.intro-screen.is-active) .masthead { visibility: hidden; }
 .room-name { margin: 4px 0 0; font-size: clamp(1.7rem, 3.2vw, 2.6rem); letter-spacing: -.08em; font-weight: 500; }
 .room-goal { text-align: right; line-height: 1.55; }
 .room-goal strong { color: var(--signal); font: 19px var(--mono); }
+.psych-panel { margin-top: 20px; padding: 13px; border: 1px solid var(--line); background: rgba(216,242,124,.035); }
+.psych-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 9px; color: var(--paper-dim); font: 8px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.psych-row b { color: var(--paper); font-size: 10px; font-weight: 400; }
+.psych-track { height: 2px; margin-top: 5px; background: var(--line); }
+.psych-track span { display: block; height: 100%; width: 100%; transform: scaleX(0.5); transform-origin: left center; background: var(--signal); transition: transform .3s ease; }
+.psych-track.awareness-track span { background: var(--cold); }
+.psych-note { margin-top: 11px; color: var(--paper-dim); font: 8px/1.45 var(--mono); }
+.model-confidence-label { margin-top: 5px; }
+.model-strip:has(#read-depth) { transition: background .25s ease, border-color .25s ease; }
+.room-main:has(.is-second-order) .model-strip { border-color: var(--signal-soft); background: rgba(216,242,124,.025); }
+.room-main:has(.is-second-order) .model-mark { border-color: var(--signal); box-shadow: 0 0 14px rgba(216,242,124,.15); }
+.corridor.is-second-order { border-color: var(--signal-soft); box-shadow: inset 0 0 42px rgba(216,242,124,.035); }
+.corridor.is-second-order .player-dot { box-shadow: 0 0 0 5px rgba(216,242,124,.16), 0 0 24px rgba(216,242,124,.9); }
+.model-theory { margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--line); }
 .model-strip { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .model-id { display: flex; align-items: center; gap: 10px; }
 .model-mark { display: grid; width: 26px; height: 26px; place-items: center; border: 1px solid var(--line-bright); color: var(--signal); font: 11px var(--mono); }
