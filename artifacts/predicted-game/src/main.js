@@ -132,13 +132,13 @@ document.querySelector("#root").innerHTML = `
         <div class="room-layout">
           <div class="room-main">
             <div class="room-intro"><div><div class="room-label">CURRENT ROOM / <span id="room-level-name">OBSERVER</span></div><h2 class="room-name" id="room-title">OBSERVER</h2></div><div class="room-goal">REACH ESCAPE SCORE<br><strong id="goal-copy">500</strong></div></div>
-            <div class="model-strip"><div class="model-id"><div class="model-mark">P</div><div><div class="model-label">THE AI THINKS</div><div class="model-says" id="model-message">YOU'LL GO LEFT</div></div></div><div class="model-read"><div class="model-label">CONFIDENCE</div><div class="confidence" id="confidence">CALIBRATING</div></div></div>
+            <div class='model-strip'><div class='model-id'><div class='model-mark'>P</div><div><div class='model-label' id='model-label'>THE AI THINKS</div><div class='model-says' id='model-message'>YOU'LL GO LEFT</div></div></div><div class='model-read'><div class='model-label'>READ DEPTH</div><div class='confidence' id='read-depth'>1ST ORDER</div><div class='model-label model-confidence-label'>CONFIDENCE</div><div class='confidence' id='confidence'>CALIBRATING</div></div></div>
             <div class="corridor" id="corridor"><div class="corridor-depth"></div><div class="lane-markers"><div class="lane-marker" data-lane="LEFT"></div><div class="lane-marker" data-lane="CENTER"></div><div class="lane-marker" data-lane="RIGHT"></div></div><div class="exit-gate" id="exit-gate"><div class="exit-label">EXIT / LOCKED</div></div><div class="player-dot" id="player-dot"></div><div class="corridor-status" id="corridor-status">POSITION / CENTER</div></div>
             <div class="choice-intro">The predicted lane pays most. The room is watching what you do with that information.</div>
             <div class="choices" role="group" aria-label="Lane choices">${ACTIONS.map((action, index) => `<button class="choice" data-action="${action}"><span class="choice-key">${KEYS[index]}</span><span class="choice-title">${action}</span><span class="choice-reward" data-reward-for="${action}">+00</span><span class="choice-note">VISIBLE REWARD</span></button>`).join("")}</div>
             <div class="feedback" id="feedback" role="status" aria-live="polite"><div><div class="feedback-title" id="feedback-title"></div><div class="feedback-copy" id="feedback-copy"></div></div><div class="feedback-score" id="feedback-score"></div></div>
           </div>
-          <aside class="room-side"><div class="side-heading"><span class="side-title">RECENT MOVEMENT</span><span class="small-copy" id="turn-readout">TURN 00</span></div><div class="history-dots" id="history-dots"><span class="history-empty">NO MOVES YET</span></div><div class="streak-readout"><div class="stat-label">BLUFF STREAK</div><strong id="bluff-streak">0</strong></div><div class="challenge-card" id="challenge-card"><div class="eyebrow">ROOM CHALLENGE</div><div class="challenge-name" id="challenge-name">SYSTEM LEARNING</div><div class="challenge-copy" id="challenge-copy">Challenges begin after Room 3.</div><div class="challenge-progress" id="challenge-progress">NOT ACTIVE</div></div></aside>
+          <aside class='room-side'><div class='side-heading'><span class='side-title'>RECENT MOVEMENT</span><span class='small-copy' id='turn-readout'>TURN 00</span></div><div class='history-dots' id='history-dots'><span class='history-empty'>NO MOVES YET</span></div><div class='streak-readout'><div class='stat-label'>BLUFF STREAK</div><strong id='bluff-streak'>0</strong></div><div class='psych-panel'><div class='eyebrow'>MODEL RELATIONSHIP</div><div class='psych-row'><span>TRUST</span><b id='trust-value'>50%</b></div><div class='psych-track'><span id='trust-fill'></span></div><div class='psych-row'><span>AWARENESS</span><b id='awareness-value'>0%</b></div><div class='psych-track awareness-track'><span id='awareness-fill'></span></div><div class='psych-note' id='psych-note'>The model is learning how you react when it speaks first.</div></div><div class='challenge-card' id='challenge-card'><div class='eyebrow'>ROOM CHALLENGE</div><div class='challenge-name' id='challenge-name'>SYSTEM LEARNING</div><div class='challenge-copy' id='challenge-copy'>Challenges begin after Room 3.</div><div class='challenge-progress' id='challenge-progress'>NOT ACTIVE</div></div></aside>
         </div>
       </div>
     </section>
@@ -577,6 +577,12 @@ class PredictedGame {
       trace: 0,
       turn: 0,
       actions: [],
+      reactionHistory: [],
+      decisionTimes: [],
+      awareness: 0,
+      trust: 50,
+      turnStartedAt: 0,
+      secondOrderReads: 0,
       predictionHits: 0,
       bluffs: 0,
       currentBluffStreak: 0,
@@ -623,7 +629,9 @@ class PredictedGame {
     const total = actions.length || 1;
     const counts = Object.fromEntries(ACTIONS.map((action) => [action, actions.filter((item) => item === action).length]));
     const repeats = actions.reduce((sum, action, index) => sum + (index > 0 && action === actions[index - 1] ? 1 : 0), 0);
-    return { counts, greed: (modelState?.highestChoices || 0) / total, repetition: repeats / total, risk: (modelState?.lowerChoices || 0) / total, bluff: (modelState?.bluffs || 0) / total };
+    const awareness = (modelState?.awareness || 0) / 100;
+    const trust = (modelState?.trust || 50) / 100;
+    return { counts, greed: (modelState?.highestChoices || 0) / total, repetition: repeats / total, risk: (modelState?.lowerChoices || 0) / total, bluff: (modelState?.bluffs || 0) / total, awareness, trust };
   }
 
   generateRewards() {
