@@ -190,3 +190,13 @@ main.app:has(.intro-screen.is-active) .masthead { visibility: hidden; }
   .choice { padding-left: 8px; padding-right: 8px; } .choice-note { letter-spacing: 0; } .room-name { font-size: 1.7rem; } .multi-player { padding: 9px; } .multi-choice { min-height: 54px; padding: 5px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; } }
+.multiplayer-screen.is-active { display: block; width: 100%; height: calc(100% - 42px); overflow: hidden; }
+.multi-shell { width: 100%; max-width: none; margin: 0; }
+.multi-grid { width: 100%; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.multi-player { width: 100%; }
+@media (min-width: 821px) {
+  .multiplayer-screen.is-active { padding-left: 0; padding-right: 0; }
+  .multi-shell { padding-left: 0; padding-right: 0; }
+  .multi-grid { gap: 22px; }
+  .multi-player { padding: 22px; }
+}
