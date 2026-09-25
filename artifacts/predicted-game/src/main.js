@@ -634,6 +634,25 @@ class PredictedGame {
     return { counts, greed: (modelState?.highestChoices || 0) / total, repetition: repeats / total, risk: (modelState?.lowerChoices || 0) / total, bluff: (modelState?.bluffs || 0) / total, awareness, trust };
   }
 
+  refineSinglePrediction(basePrediction) {
+    const single = this.single;
+    const prediction = { ...basePrediction, baseAction: basePrediction.action, secondOrder: false, depth: 1 };
+    if (this.levelIndex < 3 || single.reactionHistory.length < 3 || single.awareness < 38) return prediction;
+    const weights = Object.fromEntries(ACTIONS.map((action) => [action, 0.2]));
+    single.reactionHistory.slice(-12).forEach((record) => {
+      if (record.confidence >= 0.75 && record.action !== record.displayedAction) weights[record.action] += 1.8;
+      if (record.secondOrder && record.action !== record.displayedAction) weights[record.action] += 1.1;
+      if (record.confidence >= 0.75 && record.action === record.displayedAction) weights[record.action] += 0.35;
+    });
+    const counter = ACTIONS.filter((action) => action !== basePrediction.action).sort((a, b) => weights[b] - weights[a])[0];
+    const total = ACTIONS.reduce((sum, action) => sum + weights[action], 0);
+    const counterShare = weights[counter] / total;
+    const shouldCounterread = !!counter && counterShare >= 0.42 && (single.trust <= 48 || single.awareness >= 55);
+    if (!shouldCounterread) return prediction;
+    single.secondOrderReads += 1;
+    return { ...prediction, action: counter, confidence: clamp(Math.max(basePrediction.confidence, 0.68 + counterShare * 0.18), 0.68, 0.92), secondOrder: true, depth: 2, baseAction: basePrediction.action };
+  }
+
   generateRewards() {
     const confidence = this.single.prediction.confidence;
     const variation = Math.round(Math.random() * (this.level.rewardMax - this.level.rewardMin));
@@ -649,7 +668,10 @@ class PredictedGame {
   nextSingleTurn() {
     if (this.state !== "room") return;
     this.single.turn += 1;
-    this.single.prediction = this.single.model.predict(this.level.level, this.behaviorFor());
+    const basePrediction = this.single.model.predict(this.level.level, this.behaviorFor());
+    this.single.basePrediction = basePrediction;
+    this.single.prediction = this.refineSinglePrediction(basePrediction);
+    this.single.turnStartedAt = performance.now();
     this.generateRewards();
     this.audio.reveal();
     this.renderSingleTurn();
