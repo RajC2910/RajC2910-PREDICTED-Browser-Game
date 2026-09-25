@@ -6,7 +6,10 @@ A minimalist psychological strategy / escape game where an adaptive local AI lea
 
 ## Play
 
-**Browser prototype:**  
+**Direct game link (GitHub Pages):**  
+https://rajc2910.github.io/RajC2910-PREDICTED-Browser-Game/
+
+**Browser prototype (StackBlitz):**  
 https://stackblitz.com/fork/github/RajC2910/RajC2910-PREDICTED-Browser-Game/tree/main/playtest?startScript=dev
 
 **Playtest source:**  
