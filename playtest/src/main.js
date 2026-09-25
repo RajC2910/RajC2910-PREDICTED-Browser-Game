@@ -132,13 +132,13 @@ document.querySelector("#root").innerHTML = `
         <div class="room-layout">
           <div class="room-main">
             <div class="room-intro"><div><div class="room-label">CURRENT ROOM / <span id="room-level-name">OBSERVER</span></div><h2 class="room-name" id="room-title">OBSERVER</h2></div><div class="room-goal">REACH ESCAPE SCORE<br><strong id="goal-copy">500</strong></div></div>
-            <div class="model-strip"><div class="model-id"><div class="model-mark">P</div><div><div class="model-label">THE AI THINKS</div><div class="model-says" id="model-message">YOU'LL GO LEFT</div></div></div><div class="model-read"><div class="model-label">CONFIDENCE</div><div class="confidence" id="confidence">CALIBRATING</div></div></div>
+            <div class='model-strip'><div class='model-id'><div class='model-mark'>P</div><div><div class='model-label' id='model-label'>THE AI THINKS</div><div class='model-says' id='model-message'>YOU'LL GO LEFT</div></div></div><div class='model-read'><div class='model-label'>READ DEPTH</div><div class='confidence' id='read-depth'>1ST ORDER</div><div class='model-label model-confidence-label'>CONFIDENCE</div><div class='confidence' id='confidence'>CALIBRATING</div></div></div>
             <div class="corridor" id="corridor"><div class="corridor-depth"></div><div class="lane-markers"><div class="lane-marker" data-lane="LEFT"></div><div class="lane-marker" data-lane="CENTER"></div><div class="lane-marker" data-lane="RIGHT"></div></div><div class="exit-gate" id="exit-gate"><div class="exit-label">EXIT / LOCKED</div></div><div class="player-dot" id="player-dot"></div><div class="corridor-status" id="corridor-status">POSITION / CENTER</div></div>
             <div class="choice-intro">The predicted lane pays most. The room is watching what you do with that information.</div>
             <div class="choices" role="group" aria-label="Lane choices">${ACTIONS.map((action, index) => `<button class="choice" data-action="${action}"><span class="choice-key">${KEYS[index]}</span><span class="choice-title">${action}</span><span class="choice-reward" data-reward-for="${action}">+00</span><span class="choice-note">VISIBLE REWARD</span></button>`).join("")}</div>
             <div class="feedback" id="feedback" role="status" aria-live="polite"><div><div class="feedback-title" id="feedback-title"></div><div class="feedback-copy" id="feedback-copy"></div></div><div class="feedback-score" id="feedback-score"></div></div>
           </div>
-          <aside class="room-side"><div class="side-heading"><span class="side-title">RECENT MOVEMENT</span><span class="small-copy" id="turn-readout">TURN 00</span></div><div class="history-dots" id="history-dots"><span class="history-empty">NO MOVES YET</span></div><div class="streak-readout"><div class="stat-label">BLUFF STREAK</div><strong id="bluff-streak">0</strong></div><div class="challenge-card" id="challenge-card"><div class="eyebrow">ROOM CHALLENGE</div><div class="challenge-name" id="challenge-name">SYSTEM LEARNING</div><div class="challenge-copy" id="challenge-copy">Challenges begin after Room 3.</div><div class="challenge-progress" id="challenge-progress">NOT ACTIVE</div></div></aside>
+          <aside class='room-side'><div class='side-heading'><span class='side-title'>RECENT MOVEMENT</span><span class='small-copy' id='turn-readout'>TURN 00</span></div><div class='history-dots' id='history-dots'><span class='history-empty'>NO MOVES YET</span></div><div class='streak-readout'><div class='stat-label'>BLUFF STREAK</div><strong id='bluff-streak'>0</strong></div><div class='psych-panel'><div class='eyebrow'>MODEL RELATIONSHIP</div><div class='psych-row'><span>TRUST</span><b id='trust-value'>50%</b></div><div class='psych-track'><span id='trust-fill'></span></div><div class='psych-row'><span>AWARENESS</span><b id='awareness-value'>0%</b></div><div class='psych-track awareness-track'><span id='awareness-fill'></span></div><div class='psych-note' id='psych-note'>The model is learning how you react when it speaks first.</div></div><div class='challenge-card' id='challenge-card'><div class='eyebrow'>ROOM CHALLENGE</div><div class='challenge-name' id='challenge-name'>SYSTEM LEARNING</div><div class='challenge-copy' id='challenge-copy'>Challenges begin after Room 3.</div><div class='challenge-progress' id='challenge-progress'>NOT ACTIVE</div></div></aside>
         </div>
       </div>
     </section>
@@ -577,6 +577,12 @@ class PredictedGame {
       trace: 0,
       turn: 0,
       actions: [],
+      reactionHistory: [],
+      decisionTimes: [],
+      awareness: 0,
+      trust: 50,
+      turnStartedAt: 0,
+      secondOrderReads: 0,
       predictionHits: 0,
       bluffs: 0,
       currentBluffStreak: 0,
@@ -623,7 +629,28 @@ class PredictedGame {
     const total = actions.length || 1;
     const counts = Object.fromEntries(ACTIONS.map((action) => [action, actions.filter((item) => item === action).length]));
     const repeats = actions.reduce((sum, action, index) => sum + (index > 0 && action === actions[index - 1] ? 1 : 0), 0);
-    return { counts, greed: (modelState?.highestChoices || 0) / total, repetition: repeats / total, risk: (modelState?.lowerChoices || 0) / total, bluff: (modelState?.bluffs || 0) / total };
+    const awareness = (modelState?.awareness || 0) / 100;
+    const trust = (modelState?.trust || 50) / 100;
+    return { counts, greed: (modelState?.highestChoices || 0) / total, repetition: repeats / total, risk: (modelState?.lowerChoices || 0) / total, bluff: (modelState?.bluffs || 0) / total, awareness, trust };
+  }
+
+  refineSinglePrediction(basePrediction) {
+    const single = this.single;
+    const prediction = { ...basePrediction, baseAction: basePrediction.action, secondOrder: false, depth: 1 };
+    if (this.levelIndex < 3 || single.reactionHistory.length < 3 || single.awareness < 38) return prediction;
+    const weights = Object.fromEntries(ACTIONS.map((action) => [action, 0.2]));
+    single.reactionHistory.slice(-12).forEach((record) => {
+      if (record.confidence >= 0.75 && record.action !== record.displayedAction) weights[record.action] += 1.8;
+      if (record.secondOrder && record.action !== record.displayedAction) weights[record.action] += 1.1;
+      if (record.confidence >= 0.75 && record.action === record.displayedAction) weights[record.action] += 0.35;
+    });
+    const counter = ACTIONS.filter((action) => action !== basePrediction.action).sort((a, b) => weights[b] - weights[a])[0];
+    const total = ACTIONS.reduce((sum, action) => sum + weights[action], 0);
+    const counterShare = weights[counter] / total;
+    const shouldCounterread = !!counter && counterShare >= 0.42 && (single.trust <= 48 || single.awareness >= 55);
+    if (!shouldCounterread) return prediction;
+    single.secondOrderReads += 1;
+    return { ...prediction, action: counter, confidence: clamp(Math.max(basePrediction.confidence, 0.68 + counterShare * 0.18), 0.68, 0.92), secondOrder: true, depth: 2, baseAction: basePrediction.action };
   }
 
   generateRewards() {
@@ -641,7 +668,10 @@ class PredictedGame {
   nextSingleTurn() {
     if (this.state !== "room") return;
     this.single.turn += 1;
-    this.single.prediction = this.single.model.predict(this.level.level, this.behaviorFor());
+    const basePrediction = this.single.model.predict(this.level.level, this.behaviorFor());
+    this.single.basePrediction = basePrediction;
+    this.single.prediction = this.refineSinglePrediction(basePrediction);
+    this.single.turnStartedAt = performance.now();
     this.generateRewards();
     this.audio.reveal();
     this.renderSingleTurn();
@@ -672,7 +702,10 @@ class PredictedGame {
 
   renderSingleTurn() {
     $("#turn-readout").textContent = `TURN ${pad(this.single.turn)}`;
-    $("#model-message").textContent = `YOU'LL GO ${this.single.prediction.action}`;
+    $('#model-label').textContent = this.single.prediction.secondOrder ? 'SECOND-ORDER READ' : 'THE AI THINKS';
+    $('#model-message').textContent = this.single.prediction.secondOrder ? 'YOU\'LL REACT WITH ' + this.single.prediction.action : 'YOU\'LL GO ' + this.single.prediction.action;
+    $('#read-depth').textContent = this.single.prediction.secondOrder ? '2ND / COUNTERREAD' : '1ST ORDER';
+    $('#corridor').classList.toggle('is-second-order', !!this.single.prediction.secondOrder);
     $("#confidence").textContent = `${Math.round(this.single.prediction.confidence * 100)}%`;
     $("#confidence").classList.toggle("is-low", this.single.prediction.confidence < .65);
     $$(".choice").forEach((button) => {
@@ -694,6 +727,19 @@ class PredictedGame {
     $$(".choice").forEach((item) => { item.disabled = true; });
     button.classList.add("is-picked");
     this.audio.direction();
+    const decisionMs = Math.max(0, Math.round(performance.now() - this.single.turnStartedAt));
+    this.single.decisionTimes.push(decisionMs);
+    const displayedAction = this.single.prediction.action;
+    const baseAction = this.single.basePrediction?.action || displayedAction;
+    const reactedAgainstDisplay = action !== displayedAction;
+    const decisionDelay = clamp((decisionMs - 650) / 3200, 0, 1);
+    const reactionScore = reactedAgainstDisplay ? (this.single.prediction.confidence >= 0.65 ? 0.9 : 0.45) : (this.single.prediction.confidence >= 0.65 ? 0.12 : 0.3);
+    this.single.awareness = clamp(Math.round(this.single.awareness * 0.82 + (reactionScore + decisionDelay * 0.12) * 100 * 0.18), 0, 100);
+    if (action === displayedAction && this.single.prediction.confidence >= 0.65) this.single.trust = clamp(this.single.trust + 5, 0, 100);
+    else if (action !== displayedAction && this.single.prediction.confidence >= 0.65) this.single.trust = clamp(this.single.trust - 7, 0, 100);
+    else this.single.trust = clamp(this.single.trust + (action === displayedAction ? 1 : -1), 0, 100);
+    this.single.reactionHistory.push({ prediction: baseAction, displayedAction, action, confidence: this.single.prediction.confidence, secondOrder: !!this.single.prediction.secondOrder, decisionMs });
+    this.single.reactionHistory = this.single.reactionHistory.slice(-24);
     const predicted = action === this.single.prediction.action;
     const confident = this.single.prediction.confidence >= .65;
     const highestReward = Math.max(...Object.values(this.single.rewards));
@@ -793,6 +839,23 @@ class PredictedGame {
     $("#challenge-progress").textContent = challenge.id === "no-bluff-streak" ? `${this.single.challengeData.repeatStreak} / 3 BLUFFS IN A ROW` : challenge.id === "no-greed-streak" ? `${this.single.challengeData.highestStreak} / 3 HIGHEST REWARDS IN A ROW` : challenge.id === "no-repeats" ? `${this.single.challengeData.repeatStreak} / 3 SAME DIRECTIONS IN A ROW` : `${this.single.challengeProgress} / ${challenge.target || 1} COMPLETE`;
   }
 
+  renderPsychology() {
+    $('#trust-value').textContent = Math.round(this.single.trust) + '%';
+    $('#trust-fill').style.transform = 'scaleX(' + (this.single.trust / 100) + ')';
+    $('#awareness-value').textContent = Math.round(this.single.awareness) + '%';
+    $('#awareness-fill').style.transform = 'scaleX(' + (this.single.awareness / 100) + ')';
+    $('#psych-note').textContent = this.single.secondOrderReads > 0 ? 'The model is learning how you respond to being predicted.' : this.single.trust >= 65 ? 'You are giving confident predictions more weight.' : this.single.trust <= 35 ? 'You are treating confident predictions as bait.' : 'The model is learning how you react when it speaks first.';
+  }
+
+  modelTheoryFor() {
+    if (this.single.secondOrderReads >= 2 && this.single.awareness >= 60) return 'YOU STOPPED PLAYING THE ROOM. YOU STARTED PLAYING THE PREDICTION.';
+    if (this.single.trust >= 68) return 'YOU TRUST A CONFIDENT READ WHEN IT PAYS.';
+    if (this.single.trust <= 32) return 'YOU ASSUME THE MODEL IS BAITING YOU.';
+    if (this.single.awareness >= 55) return 'YOU CHANGE BEHAVIOUR WHEN YOU FEEL OBSERVED.';
+    const average = this.single.decisionTimes.length ? Math.round(this.single.decisionTimes.reduce((sum, value) => sum + value, 0) / this.single.decisionTimes.length) : 0;
+    return average > 1800 ? 'YOU TAKE LONGER WHEN THE MODEL SOUNDS CERTAIN.' : 'YOU OPTIMIZE BEFORE YOU QUESTION THE MODEL.';
+  }
+
   renderSingleHud() {
     $("#score").textContent = this.single.score;
     $("#trace-value").textContent = `${this.single.trace} / 100`;
@@ -800,6 +863,7 @@ class PredictedGame {
     $("#trace-fill").classList.toggle("is-danger", this.single.trace >= 70);
     $("#bluff-streak").textContent = this.single.currentBluffStreak;
     this.renderChallenge();
+    this.renderPsychology();
   }
 
   renderHistory() {
@@ -872,6 +936,7 @@ class PredictedGame {
   }
 
   renderComplete() {
+    this.single.modelTheory = this.modelTheoryFor();
     const stats = this.personalityStats();
     const accuracy = this.single.actions.length ? Math.round((this.single.predictionHits / this.single.actions.length) * 100) : 0;
     $("#complete-score").textContent = this.single.score;
@@ -882,7 +947,7 @@ class PredictedGame {
     $("#complete-turns").textContent = this.single.actions.length;
     $("#complete-lead").textContent = this.levelIndex >= LEVELS.length - 1 ? "The final room opened. The system has no further corridor to offer." : `Room ${pad(this.level.level)} is clear. Room ${pad(this.level.level + 1)} is now unlocked.`;
     $("#next-room-button").textContent = this.levelIndex >= LEVELS.length - 1 ? "RETURN TO MENU" : `ENTER ROOM ${pad(this.level.level + 1)}`;
-    $("#profile-metrics").innerHTML = `<div class="stat-label">BEHAVIOUR READ</div><div class="profile-grid"><span>GREED <b>${Math.round(stats.greed * 100)}%</b></span><span>REPETITION <b>${Math.round(stats.repetition * 100)}%</b></span><span>RISK <b>${Math.round(stats.risk * 100)}%</b></span><span>BLUFF <b>${this.single.bluffs}</b></span><span>SEQUENCE <b>${stats.sequence}</b></span></div>`;
+    $("#profile-metrics").innerHTML = `<div class="stat-label">BEHAVIOUR READ</div><div class="profile-grid"><span>GREED <b>${Math.round(stats.greed * 100)}%</b></span><span>REPETITION <b>${Math.round(stats.repetition * 100)}%</b></span><span>RISK <b>${Math.round(stats.risk * 100)}%</b></span><span>BLUFF <b>${this.single.bluffs}</b></span><span>AWARENESS <b>${Math.round(this.single.awareness)}%</b></span><span>TRUST <b>${Math.round(this.single.trust)}%</b></span><span>2ND-ORDER <b>${this.single.secondOrderReads}</b></span><span>AVG DECISION <b>${this.single.decisionTimes.length ? Math.round(this.single.decisionTimes.reduce((sum, value) => sum + value, 0) / this.single.decisionTimes.length) : 0}MS</b></span><span>SEQUENCE <b>${stats.sequence}</b></span></div><div class="model-theory"><div class="stat-label">MODEL THEORY</div><div class="stat-value">${this.single.modelTheory}</div></div>`;
     $("#complete-challenge").innerHTML = this.single.challenge ? `<div class="stat-label">CHALLENGE</div><div class="stat-value">+${this.single.challenge.bonus} BONUS / ${this.single.challenge.name}</div>` : "";
   }
 
